@@ -1,56 +1,41 @@
-# Welcome to your Expo app 👋
+# PolyClaw Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Standalone Expo SDK 56 operator application for monitoring PolyClaw paper and live trading. This is intentionally separate from betclaw-mobile.
 
-## Get started
+## Operator capabilities
 
-1. Install dependencies
+- Monitor bankroll, P&L, exposure, drawdown, execution mode, and halt state.
+- Review planned trades before submission and cancel only PLANNED intents.
+- Browse clearly labelled paper/live history and paper-to-live readiness.
+- Inspect server-enforced risk limits and pause or explicitly resume trading.
+- Monitor Polymarket, SportyBet manual execution, and research connections.
+- Record or reject manual SportyBet handoffs without storing bookmaker credentials.
+- Receive operational alerts and review the append-only operator audit trail.
 
-   ```bash
-   npm install
-   ```
+The app becomes read-only whenever the backend snapshot is stale or unavailable. Trading authority, secrets, idempotency, limits, and audit records stay server-side.
 
-2. Start the app
+## Local setup
 
-   ```bash
-   npx expo start
-   ```
+    cp .env.example .env
+    npm install
+    npx expo start
 
-In the output, you'll find options to open the app in a
+EXPO_PUBLIC_API_URL points to the BetClaw web application, not directly to PolyClaw. On a physical device it must be a reachable HTTPS address. EXPO_PUBLIC_EXPO_PROJECT_ID enables Expo push-token registration.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Only BetClaw users with the ADMIN role can sign in. The web backend must configure:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+    POLYCLAW_CONTROL_API_URL=http://127.0.0.1:4310/v1
+    POLYCLAW_CONTROL_API_TOKEN=<shared-private-token>
 
-## Get a fresh project
+The PolyClaw process must configure the matching CONTROL_API_TOKEN and run yarn control.
 
-When you're ready, run:
+## Verification and private beta
 
-```bash
-npm run reset-project
-```
+    npx expo install --check
+    npx tsc --noEmit
+    npm run lint
+    EXPO_PUBLIC_API_URL=https://example.invalid npx expo export --platform ios
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Use eas build --profile preview for the initial private beta. Do not switch PolyClaw to live mode until venue credentials, collateral compatibility, reconciliation, and the paper-trading graduation gate are independently verified.
 
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# polyclaw-mobile
