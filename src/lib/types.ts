@@ -33,6 +33,17 @@ export type Trade = {
   entryPrice: number;
   averageFillPrice?: number | null;
   probability: number;
+  probabilityProvenance?: {
+    forecastId?: string | null;
+    decisionMode?: 'BASELINE' | 'SHADOW' | 'ACTIVE' | null;
+    modelVersion?: string | null;
+    modelHealth?: 'HEALTHY' | 'FALLBACK' | 'BLOCKED' | 'DISABLED' | null;
+    bookmakerProb?: number | null;
+    dixonColesProb?: number | null;
+    catboostProb?: number | null;
+    ensembleProb?: number | null;
+    appliedProb: number;
+  };
   edge: number;
   feePaid: number;
   pnl?: number | null;
@@ -98,3 +109,46 @@ export type AlertItem = { id: string; severity: 'INFO' | 'WARNING' | 'CRITICAL';
 export type AuditItem = { id: string; actorId: string; action: string; targetType?: string | null; targetId?: string | null; createdAt: string };
 export type ManualBet = { id: string; fixtureLabel: string; marketLabel: string; proposedOdds: number; acceptedOdds?: number | null; plannedStake: number; transactionCode?: string | null; status: string; expiresAt: string; createdAt: string };
 export type ItemsData<T> = { items: T[] };
+
+export type ModelMarketMetrics = {
+  sample?: number;
+  ensembleBrier?: number | null;
+  dixonColesBrier?: number | null;
+  catboostBrier?: number | null;
+  bookmakerBrier?: number | null;
+  heuristicBrier?: number | null;
+  ensembleLogLoss?: number | null;
+  bookmakerLogLoss?: number | null;
+  heuristicLogLoss?: number | null;
+};
+export type ModelOverallMetrics = ModelMarketMetrics;
+export type ModelArtifactHealth = {
+  version: string;
+  artifactSha256: string;
+  metrics: { overall?: ModelOverallMetrics; markets?: Record<string, ModelMarketMetrics>; catboostAvailable?: boolean; catboostTrained?: boolean };
+  metadata: { catboostAvailable?: boolean; catboostTrained?: boolean; dixonMatches?: number; format?: string };
+  componentVersions?: Record<string, string>;
+  components?: Record<string, { version: string; artifactSha256: string | null; status: string }>;
+};
+export type ModelConsumerHealth = {
+  consumer: 'BETCLAW' | 'POLYCLAW';
+  status: 'SHADOW' | 'ELIGIBLE' | 'ACTIVE' | 'FALLBACK' | 'BLOCKED';
+  activeVersion: string | null;
+  previousVersion: string | null;
+  candidateSince?: string | null;
+  promotionsPaused: boolean;
+  eligible: boolean;
+  candidate: null | ModelArtifactHealth & {
+    shadowStartedAt: string;
+  };
+  active: null | ModelArtifactHealth & { activatedAt?: string | null };
+  evidence: Record<string, unknown>;
+  gates: { key: string; pass: boolean; detail: string }[];
+  drift: { brierDelta: number | null; status: 'STABLE' | 'WATCH' | 'INSUFFICIENT_DATA' };
+  trend: { version: string; createdAt: string; metrics: ModelOverallMetrics }[];
+};
+export type ModelsData = {
+  service: { status: string; catboostAvailable: boolean; loadedVersions: string[]; error?: string };
+  consumers: ModelConsumerHealth[];
+  updatedAt: string;
+};
