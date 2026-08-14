@@ -50,7 +50,7 @@ export type Trade = {
   outcome?: string | null;
   exchangeOrderId?: string | null;
   kickoff: string;
-  session: 'MORNING' | 'EVENING';
+  session: 'MORNING' | 'AFTERNOON' | 'NIGHT';
   intentCreatedAt: string;
   submittedAt?: string | null;
   createdAt: string;
@@ -69,7 +69,7 @@ export type Overview = {
   roi: number;
   drawdown: number;
   risk: { halted: boolean; haltReason?: string | null; consecutiveLosses: number; warningThreshold: number; haltThreshold: number; configVersion: string };
-  sessions: { id: string; slot: 'MORNING' | 'EVENING'; status: string; haltReason?: string | null; createdAt: string }[];
+  sessions: { id: string; slot: 'MORNING' | 'AFTERNOON' | 'NIGHT'; status: string; haltReason?: string | null; createdAt: string }[];
   upcomingTrade: Trade | null;
 };
 
