@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
@@ -6,24 +6,31 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/auth/provider';
 import { PolyClawThemeProvider, usePolyClawTheme } from '@/theme';
 import { NotificationBootstrap } from '@/notifications/bootstrap';
+import { UnlockView } from '@/components/unlock-view';
 
 SplashScreen.preventAutoHideAsync();
 
 function AuthenticatedStack() {
-  const { state } = useAuth();
+  const { state, session, biometricEnabled } = useAuth();
   const { theme } = usePolyClawTheme();
   const router = useRouter();
   const pathname = usePathname();
+  const [unlockedToken, setUnlockedToken] = useState<string | null>(null);
+
   useEffect(() => {
     if (state === 'hydrating') return;
-    const onLogin = pathname === '/login';
-    if (state === 'anonymous' && !onLogin) router.replace('/login');
-    if (state === 'authenticated' && onLogin) router.replace('/');
+    const inOnboarding = pathname === '/welcome' || pathname === '/sign-in';
+    if (state === 'anonymous' && !inOnboarding) router.replace('/welcome' as never);
+    if (state === 'authenticated' && inOnboarding) router.replace('/');
   }, [pathname, router, state]);
-  return <>
-    <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }} />
-  </>;
+
+  const needsUnlock = state === 'authenticated' && biometricEnabled && !!session && unlockedToken !== session.accessToken;
+  return (
+    <>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      {needsUnlock ? <UnlockView onSuccess={() => setUnlockedToken(session ? session.accessToken : 'unlocked')} /> : <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background }, animation: 'slide_from_right', animationDuration: 260 }} />}
+    </>
+  );
 }
 
 export default function RootLayout() {

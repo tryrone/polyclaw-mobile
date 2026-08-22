@@ -19,7 +19,7 @@ function hash(value: string | null | undefined) {
 
 function StatusIcon({ status }: { status: ModelConsumerHealth['status'] }) {
   const { theme } = usePolyClawTheme();
-  const props = { size: 24, color: status === 'ACTIVE' || status === 'ELIGIBLE' ? theme.lime : status === 'SHADOW' ? theme.amber : theme.red };
+  const props = { size: 24, color: status === 'ACTIVE' || status === 'ELIGIBLE' ? theme.success : status === 'SHADOW' ? theme.warning : theme.danger };
   if (status === 'ACTIVE') return <CheckCircle2 {...props} accessibilityLabel="Active" />;
   if (status === 'ELIGIBLE') return <CircleAlert {...props} accessibilityLabel="Eligible for manual promotion" />;
   if (status === 'SHADOW') return <Clock3 {...props} accessibilityLabel="Running in shadow" />;
@@ -42,7 +42,7 @@ function MetricRow({ label, left, right, accent = false }: { label: string; left
   const { theme } = usePolyClawTheme();
   return <View style={styles.metricRow}>
     <Text style={[styles.metricLabel, { color: theme.textMuted }]}>{label}</Text>
-    <Text style={[styles.metricValue, { color: accent ? theme.lime : theme.text }]}>{left} · {right}</Text>
+    <Text style={[styles.metricValue, { color: accent ? theme.success : theme.text }]}>{left} · {right}</Text>
   </View>;
 }
 
@@ -78,7 +78,7 @@ export default function ModelsScreen() {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>14-day promotion checklist</Text>
         <Text style={[styles.detail, { color: theme.textMuted }]}>Manual promotion remains disabled until every item passes.</Text>
         <View style={styles.gateList}>{consumer.gates.map((gate) => <View key={gate.key} style={[styles.gate, { borderBottomColor: theme.border }]} accessible accessibilityLabel={`${gate.pass ? 'Passed' : 'Failed'} ${gate.key}: ${gate.detail}`}>
-          {gate.pass ? <CheckCircle2 size={18} color={theme.lime} /> : <CircleAlert size={18} color={theme.amber} />}
+          {gate.pass ? <CheckCircle2 size={18} color={theme.success} /> : <CircleAlert size={18} color={theme.warning} />}
           <View style={styles.flex}><Text style={[styles.gateTitle, { color: theme.text }]}>{gate.key.replaceAll('_', ' ')}</Text><Text style={[styles.detail, { color: theme.textMuted }]}>{gate.detail}</Text></View>
         </View>)}{consumer.gates.length === 0 ? <Text style={[styles.detail, { color: theme.textMuted }]}>No candidate is currently awaiting promotion.</Text> : null}</View>
       </Card>
@@ -91,7 +91,7 @@ export default function ModelsScreen() {
 
       <Card>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Calibration and drift trend</Text>
-        <Text style={[styles.detail, { color: consumer.drift.status === 'WATCH' ? theme.amber : theme.textMuted }]}>
+        <Text style={[styles.detail, { color: consumer.drift.status === 'WATCH' ? theme.warning : theme.textMuted }]}>
           {consumer.drift.status.replaceAll('_', ' ')} · Brier change {consumer.drift.brierDelta == null ? 'not available' : `${consumer.drift.brierDelta >= 0 ? '+' : ''}${consumer.drift.brierDelta.toFixed(4)}`} versus the previous artifact.
         </Text>
         <View style={styles.trendTable} accessibilityLabel="Model metric history table">
@@ -108,7 +108,7 @@ export default function ModelsScreen() {
 function ComponentCard({ icon: Icon, name, version, detail, healthy }: { icon: LucideIcon; name: string; version: string; detail: string; healthy: boolean }) {
   const { theme } = usePolyClawTheme();
   return <Card style={styles.componentCard} accessible accessibilityLabel={`${name}, ${healthy ? 'healthy' : 'not ready'}, ${version}`}>
-    <View style={styles.componentTitle}><Icon size={19} color={healthy ? theme.lime : theme.amber} /><Text style={[styles.componentName, { color: theme.text }]}>{name}</Text></View>
+    <View style={styles.componentTitle}><Icon size={19} color={healthy ? theme.success : theme.warning} /><Text style={[styles.componentName, { color: theme.text }]}>{name}</Text></View>
     <Text style={[styles.version, { color: theme.textSoft }]}>{version}</Text><Text style={[styles.detail, { color: theme.textMuted }]}>{detail}</Text>
   </Card>;
 }

@@ -1,12 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { loginOperator, logoutOperator, operatorRequest, refreshOperator } from '@/lib/api';
-import { readSession, writeSession } from '@/lib/storage';
+import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
 
 type AuthState = 'hydrating' | 'anonymous' | 'authenticated';
 type AuthValue = {
   state: AuthState;
   session: AuthSession | null;
+  biometricSupported: boolean;
+  biometricEnabled: boolean;
+  setBiometricEnabled: (enabled: boolean) => void;
+  unlockWithBiometric: () => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   request: <T>(path: string, init?: { method?: 'POST'; body?: Record<string, unknown>; idempotencyKey?: string }) => Promise<OperatorEnvelope<T>>;
@@ -17,6 +22,13 @@ const Context = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>('hydrating');
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+
+  useEffect(() => {
+    Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]).then(([hardware, enrolled]) => setBiometricSupported(hardware && enrolled)).catch(() => undefined);
+    readBiometricEnabled().then(setBiometricEnabledState).catch(() => undefined);
+  }, []);
 
   const save = useCallback(async (next: AuthSession | null) => {
     setSession(next);
@@ -39,6 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session) await logoutOperator(session).catch(() => undefined);
     await save(null);
   }, [save, session]);
+  const setBiometricEnabled = useCallback((enabled: boolean) => {
+    setBiometricEnabledState(enabled);
+    void writeBiometricEnabled(enabled);
+  }, []);
+  const unlockWithBiometric = useCallback(async () => {
+    const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Unlock PolyClaw', fallbackLabel: 'Use password' }).catch(() => ({ success: false } as const));
+    return result.success;
+  }, []);
 
   const freshSession = useCallback(async () => {
     if (!session) throw Object.assign(new Error('Sign in required'), { status: 401 });
@@ -65,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [freshSession, save]);
 
-  const value = useMemo(() => ({ state, session, signIn, signOut, request }), [state, session, signIn, signOut, request]);
+  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, setBiometricEnabled, unlockWithBiometric, signIn, signOut, request }), [state, session, biometricSupported, biometricEnabled, setBiometricEnabled, unlockWithBiometric, signIn, signOut, request]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

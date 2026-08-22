@@ -4,6 +4,15 @@ import { Platform } from 'react-native';
 import type { AuthSession } from './types';
 
 const KEY = 'polyclaw.operator.session';
+const BIOMETRIC_KEY = 'polyclaw.biometric.enabled';
+
+export async function readBiometricEnabled(): Promise<boolean> {
+  try { return (await AsyncStorage.getItem(BIOMETRIC_KEY)) === 'true'; } catch { return false; }
+}
+
+export async function writeBiometricEnabled(enabled: boolean) {
+  await AsyncStorage.setItem(BIOMETRIC_KEY, enabled ? 'true' : 'false').catch(() => undefined);
+}
 
 async function secureAvailable() {
   return Platform.OS !== 'web' && SecureStore.isAvailableAsync();

@@ -17,7 +17,7 @@
     "android": {
       "package": "com.betclaw.polyclaw",
       "adaptiveIcon": {
-        "backgroundColor": "#030704",
+        "backgroundColor": "#08060F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -33,9 +33,15 @@
       "expo-notifications",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow PolyClaw to unlock using Face ID."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
-          "backgroundColor": "#030704",
+          "backgroundColor": "#08060F",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
