@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { PlayCircle } from 'lucide-react-native';
+import { PlayCircle } from '@/components/modern-icons';
 import { useAuth } from '@/auth/provider';
 import { DetailScreen } from '@/components/detail-layout';
 import { ActionButton, Card, Metric, ResourceState, StatusPill, money, percent } from '@/components/ui-kit';

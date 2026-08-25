@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowUpRight, Clock3 } from 'lucide-react-native';
+import { ArrowUpRight, Clock3 } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Trade } from '@/lib/types';
 import { fonts, usePolyClawTheme } from '@/theme';

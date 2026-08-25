@@ -1,4 +1,4 @@
-import { LockKeyhole } from 'lucide-react-native';
+import { LockKeyhole } from '@/components/modern-icons';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { haptics, PressableScale, Staggered } from '@/components/motion';

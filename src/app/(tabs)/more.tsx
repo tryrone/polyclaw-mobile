@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Bell, BrainCircuit, Cable, ChevronRight, ClipboardCheck, ClipboardList, LogOut, Moon, ShieldAlert, Sun } from 'lucide-react-native';
+import { Bell, BrainCircuit, Cable, ChevronRight, ClipboardCheck, ClipboardList, LogOut, Moon, ShieldAlert, Sun } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/provider';
 import { haptics, PressableScale } from '@/components/motion';

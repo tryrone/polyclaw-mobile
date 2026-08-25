@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Activity, ChevronDown, History, ShieldCheck } from 'lucide-react-native';
+import { Activity, ChevronDown, History, ShieldCheck } from '@/components/modern-icons';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -8,9 +8,9 @@ import { haptics, PressableScale, Staggered, useReducedMotion } from '@/componen
 import { fonts, motion, radius, spacing, usePolyClawTheme } from '@/theme';
 
 const valueRows = [
-  { icon: Activity, title: 'Live monitor', detail: 'Bankroll, exposure and every decision as it happens.' },
-  { icon: ShieldCheck, title: 'Server-enforced risk', detail: 'Daily caps and drawdown halts you cannot override.' },
-  { icon: History, title: 'Immutable history', detail: 'Every trade keeps its full decision trace.' },
+  { icon: Activity, title: 'Automatic paper trading', detail: 'Eligible model decisions appear in your simulated portfolio automatically.' },
+  { icon: ShieldCheck, title: 'Server-enforced risk', detail: 'Your profile, daily cap, and drawdown halt are applied to every decision.' },
+  { icon: History, title: 'Clear decision history', detail: 'See simulated stakes, skipped decisions, outcomes, and P&L.' },
 ];
 
 export default function WelcomeScreen() {
@@ -34,12 +34,12 @@ export default function WelcomeScreen() {
             <Text style={[styles.markText, { color: theme.accentInk }]}>P</Text>
           </LinearGradient>
         </Animated.View>
-        <Staggered index={1}><Text style={[styles.kicker, { color: theme.accent }]}>PRIVATE OPERATOR ACCESS</Text></Staggered>
-        <Staggered index={2}><Text style={[styles.title, { color: theme.text }]}>See every move.{'\n'}Control the risk.</Text></Staggered>
-        <Staggered index={3}><Text style={[styles.copy, { color: theme.textMuted }]}>A dedicated monitoring console for PolyClaw paper and live trading.</Text></Staggered>
+        <Staggered index={1}><Text style={[styles.kicker, { color: theme.accent }]}>YOUR AUTOMATED PAPER BOT</Text></Staggered>
+        <Staggered index={2}><Text style={[styles.title, { color: theme.text }]}>Set your risk.{'\n'}Let PolyClaw work.</Text></Staggered>
+        <Staggered index={3}><Text style={[styles.copy, { color: theme.textMuted }]}>Start with a fixed $1,000 simulation and follow every model-driven decision without funding a wallet.</Text></Staggered>
         <Staggered index={4} style={styles.ctaWrap}>
-          <PressableScale accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => router.push('/(onboarding)/sign-in' as never)} containerStyle={[styles.ctaShadow, { shadowColor: theme.accentStrong }]} style={({ pressed }) => [styles.cta, { backgroundColor: theme.accentStrong }, pressed && styles.pressed]}>
-            <Text style={[styles.ctaText, { color: theme.accentInk }]}>Sign in</Text>
+          <PressableScale accessibilityRole="button" accessibilityLabel="Get started" onPress={() => router.push('/(onboarding)/sign-up' as never)} containerStyle={[styles.ctaShadow, { shadowColor: theme.accentStrong }]} style={({ pressed }) => [styles.cta, { backgroundColor: theme.accentStrong }, pressed && styles.pressed]}>
+            <Text style={[styles.ctaText, { color: theme.accentInk }]}>Get started</Text>
           </PressableScale>
         </Staggered>
         <Staggered index={5} style={{ width: '100%' }}>
@@ -61,7 +61,7 @@ export default function WelcomeScreen() {
           ) : null}
         </Staggered>
       </View>
-      <Text style={[styles.footer, { color: theme.textMuted }]}>Monitoring is read-only while data is stale or offline.</Text>
+      <Text style={[styles.footer, { color: theme.textMuted }]}>Paper trading only. No guaranteed returns. Live wallets remain unavailable.</Text>
     </View>
   );
 }

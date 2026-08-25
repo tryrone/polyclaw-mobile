@@ -21,23 +21,33 @@ async function deviceInput() {
   return { deviceId: `${appId}:${Platform.OS}`, deviceName: Device.deviceName ?? 'PolyClaw device', platform: Platform.OS };
 }
 
-export async function loginOperator(email: string, password: string): Promise<AuthSession> {
-  const result = await client().auth.mobileLogin.mutate({ email, password, ...(await deviceInput()) }) as AuthSession;
-  if (result.user.role !== 'ADMIN') {
-    await client(result.accessToken).auth.mobileLogout.mutate({ accessToken: result.accessToken, refreshToken: result.refreshToken }).catch(() => undefined);
-    throw new Error('This account is not authorized as a PolyClaw operator');
-  }
-  return result;
+export async function loginUser(email: string, password: string): Promise<AuthSession> {
+  return client().auth.mobileLogin.mutate({ email, password, ...(await deviceInput()) }) as Promise<AuthSession>;
 }
 
-export async function refreshOperator(refreshToken: string): Promise<AuthSession> {
-  const result = await client().auth.mobileRefresh.mutate({ refreshToken, ...(await deviceInput()) }) as AuthSession;
-  if (result.user.role !== 'ADMIN') throw new Error('Operator access was removed');
-  return result;
+export async function registerUser(input: { email: string; password: string; name: string }): Promise<AuthSession> {
+  return client().auth.mobileRegister.mutate({ ...input, ...(await deviceInput()) }) as Promise<AuthSession>;
 }
 
-export async function logoutOperator(session: AuthSession) {
+export async function loginWithApple(input: { identityToken: string; givenName?: string; familyName?: string }): Promise<AuthSession> {
+  return client().auth.mobileAppleLogin.mutate({ ...input, ...(await deviceInput()) }) as Promise<AuthSession>;
+}
+
+export async function loginWithGoogleIdToken(idToken: string): Promise<AuthSession> {
+  return client().auth.mobileGoogleLogin.mutate({ idToken, ...(await deviceInput()) }) as Promise<AuthSession>;
+}
+
+export async function refreshUser(refreshToken: string): Promise<AuthSession> {
+  return client().auth.mobileRefresh.mutate({ refreshToken, ...(await deviceInput()) }) as Promise<AuthSession>;
+}
+
+export async function logoutUser(session: AuthSession) {
   await client(session.accessToken).auth.mobileLogout.mutate({ accessToken: session.accessToken, refreshToken: session.refreshToken });
+}
+
+export async function consumerRequest<T>(accessToken: string, procedure: 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'createKoraCheckout', input?: Record<string, unknown>): Promise<T> {
+  const endpoint = client(accessToken).polyClawConsumer[procedure];
+  return (procedure === 'dashboard' ? endpoint.query() : endpoint.mutate(input ?? {})) as Promise<T>;
 }
 
 export async function registerPushToken(accessToken: string, expoPushToken: string) {

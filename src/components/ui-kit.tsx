@@ -1,5 +1,5 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import type { LucideIcon } from 'lucide-react-native';
+import type { LucideIcon } from '@/components/modern-icons';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
 import type { ReactElement } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   screen: { padding: spacing.lg, paddingBottom: 130, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
   header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12 },
   eyebrow: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.8, marginBottom: 5 },
-  title: { fontFamily: fonts.bold, fontSize: 30, letterSpacing: -1.2 },
+  title: { fontFamily: fonts.displayExtraBold, fontSize: 30, letterSpacing: -1.2 },
   card: { borderWidth: 1, borderRadius: radius.md, padding: spacing.lg },
   raised: { borderWidth: StyleSheet.hairlineWidth },
   glass: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(167,139,250,0.28)' },
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   pillText: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1 },
   metric: { minWidth: '45%', flex: 1, gap: 5 },
   metricLabel: { fontFamily: fonts.medium, fontSize: 12 },
-  metricValue: { fontFamily: fonts.bold, fontSize: 24, letterSpacing: -0.8 },
+  metricValue: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.8 },
   detail: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
   button: { minHeight: 50, borderRadius: radius.sm, paddingHorizontal: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonText: { fontFamily: fonts.bold, fontSize: 14 },
@@ -154,6 +154,6 @@ const styles = StyleSheet.create({
   skeletonStack: { gap: spacing.lg },
   stale: { borderRadius: radius.sm, padding: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 },
+  sectionTitle: { fontFamily: fonts.display, fontSize: 17 },
   sectionMeta: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 1 },
 });

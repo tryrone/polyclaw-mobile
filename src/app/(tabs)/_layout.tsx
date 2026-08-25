@@ -1,5 +1,5 @@
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { Activity, ChartNoAxesCombined, History, ListOrdered, MoreHorizontal } from 'lucide-react-native';
+import { ChartLineUp, ClockCounterClockwise, DotsThree, ListNumbers, Pulse, type Icon } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,18 +7,19 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics, useReducedMotion } from '@/components/motion';
 import { fonts, motion, radius, spacing, usePolyClawTheme } from '@/theme';
+import { useAuth } from '@/auth/provider';
 
 const glassAvailable = isGlassEffectAPIAvailable();
 
 const tabs = [
-  { name: 'index', href: '/' as const, label: 'Monitor', Icon: Activity },
-  { name: 'queue', href: '/queue' as const, label: 'Queue', Icon: ListOrdered },
-  { name: 'trades', href: '/trades' as const, label: 'Trades', Icon: History },
-  { name: 'performance', href: '/performance' as const, label: 'Results', Icon: ChartNoAxesCombined },
-  { name: 'more', href: '/more' as const, label: 'More', Icon: MoreHorizontal },
+  { name: 'index', href: '/' as const, label: 'Monitor', Icon: Pulse },
+  { name: 'queue', href: '/queue' as const, label: 'Queue', Icon: ListNumbers },
+  { name: 'trades', href: '/trades' as const, label: 'Trades', Icon: ClockCounterClockwise },
+  { name: 'performance', href: '/performance' as const, label: 'Results', Icon: ChartLineUp },
+  { name: 'more', href: '/more' as const, label: 'More', Icon: DotsThree },
 ] as const;
 
-function TabButton({ name, href, label, Icon, active }: { name: string; href: '/' | '/queue' | '/trades' | '/performance' | '/more'; label: string; Icon: typeof Activity; active: boolean }) {
+function TabButton({ href, label, Icon, active }: { name: string; href: '/' | '/queue' | '/trades' | '/performance' | '/more'; label: string; Icon: Icon; active: boolean }) {
   const { theme } = usePolyClawTheme();
   const reduce = useReducedMotion();
   const router = useRouter();
@@ -36,8 +37,8 @@ function TabButton({ name, href, label, Icon, active }: { name: string; href: '/
   };
   return (
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={label} onPress={onPress} style={styles.tab}>
-      <Animated.View style={iconStyle}><Icon size={21} color={color} strokeWidth={active ? 2.4 : 2} /></Animated.View>
-      <Text numberOfLines={1} style={[styles.label, { color }, active && styles.labelActive]}>{label}</Text>
+      <Animated.View style={iconStyle}><Icon size={22} color={color} weight={active ? 'fill' : 'regular'} /></Animated.View>
+      {active ? <Text numberOfLines={1} style={[styles.label, { color }, styles.labelActive]}>{label}</Text> : null}
     </Pressable>
   );
 }
@@ -75,7 +76,9 @@ function FloatingTabBar({ active }: { active: string }) {
 }
 
 export default function TabsLayout() {
+  const { session } = useAuth();
   const pathname = usePathname();
+  if (session?.user.role !== 'ADMIN') return null;
   const active = pathname === '/' ? 'index' : pathname.replace(/^\//, '').replace(/\/$/, '');
   return (
     <>
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
   bar: { borderRadius: radius.lg + 2, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   glass: { borderColor: 'rgba(167,139,250,0.30)' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 6 },
-  tab: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 3 },
+  tab: { flex: 1, minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 3 },
   label: { fontFamily: fonts.semibold, fontSize: 10 },
   labelActive: { fontFamily: fonts.bold },
 });

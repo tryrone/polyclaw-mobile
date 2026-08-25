@@ -9,13 +9,34 @@ export type OperatorEnvelope<T> = {
   data: T;
 };
 
-export type OperatorUser = { id: string; email: string; name: string | null; role: string };
+export type OperatorUser = { id: string; email: string; name: string | null; role: 'USER' | 'ADMIN' };
 export type AuthSession = {
   accessToken: string;
   refreshToken: string;
   expiresAt: string;
   refreshExpiresAt: string;
   user: OperatorUser;
+};
+
+export type ConsumerDashboard = {
+  mode: 'PAPER';
+  liveTradingEnabled: false;
+  profile: {
+    riskAppetite: 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
+    maximumTradeUsdc: number;
+    paperBankrollUsdc: number;
+    botState: 'SETUP' | 'ACTIVE' | 'PAUSED_USER' | 'PAUSED_SAFETY' | 'PAUSED_BILLING' | 'CLOSED';
+    pauseReason?: string | null;
+  };
+  entitlement: null | { status: string; trialEndsAt?: string | null; currentPeriodEnd?: string | null; active: boolean };
+  positions: {
+    id: string; fixtureLabel: string; selectionLabel: string; market: string; probability: number;
+    entryPrice: number; plannedStakeUsdc: number; status: 'OPEN' | 'SKIPPED' | 'SETTLED' | 'CANCELLED';
+    realizedPnlUsdc?: number | null; rejectionReasons?: string[] | null; createdAt: string;
+  }[];
+  summary: { dailyExposureUsdc: number; openExposureUsdc: number; openPositions: number; availableBalanceUsdc: number; realizedPnlUsdc: number; equityUsdc: number; drawdownFraction: number };
+  riskLimits: { stakeBankrollFraction: number; dailyExposureBankrollFraction: number; maximumDrawdownFraction: number };
+  release: { activationRequiresInvite: boolean };
 };
 
 export type Trade = {
@@ -56,6 +77,43 @@ export type Trade = {
   createdAt: string;
   updatedAt: string;
   settledAt?: string | null;
+  evidence?: unknown;
+  criteria?: DecisionCriterion[];
+  priceSnapshots?: PriceSnapshot[];
+};
+
+export type DecisionCriterion = {
+  criterion: string;
+  pass: boolean;
+  value: number | string | boolean | null;
+  threshold?: number | string;
+};
+
+export type PriceSnapshot = {
+  kind: string;
+  bid: number;
+  ask: number;
+  takenAt: string;
+};
+
+export type SessionSummary = {
+  mode?: Mode;
+  discovered?: number;
+  supported?: number;
+  confident?: number;
+  quoted?: number;
+  forecasted?: number;
+  passedGates?: number;
+  selected?: number;
+  planned?: number;
+  filled?: number;
+  preparation?: {
+    requested?: number;
+    enriched?: number;
+    oddsRefreshed?: number;
+    ready?: number;
+    failures?: { fixtureId: string; stage: string; reason: string }[];
+  };
 };
 
 export type Overview = {
@@ -69,13 +127,21 @@ export type Overview = {
   roi: number;
   drawdown: number;
   risk: { halted: boolean; haltReason?: string | null; consecutiveLosses: number; warningThreshold: number; haltThreshold: number; configVersion: string };
-  sessions: { id: string; slot: 'MORNING' | 'AFTERNOON' | 'NIGHT'; status: string; haltReason?: string | null; createdAt: string }[];
+  sessions: { id: string; slot: 'MORNING' | 'AFTERNOON' | 'NIGHT'; status: string; haltReason?: string | null; summary?: SessionSummary | null; createdAt: string }[];
   upcomingTrade: Trade | null;
 };
 
 export type QueueData = {
   ready: Trade[];
-  noBet: { id: string; fixtureId?: string | null; gammaId: string; session: string; reasons: unknown; createdAt: string }[];
+  noBet: {
+    id: string;
+    fixtureId?: string | null;
+    gammaId: string;
+    session: string;
+    reasons: DecisionCriterion[] | unknown;
+    probabilityProvenance?: Trade['probabilityProvenance'];
+    createdAt: string;
+  }[];
 };
 
 export type TradesData = { items: Trade[]; nextCursor?: string | null };
@@ -151,4 +217,29 @@ export type ModelsData = {
   service: { status: string; catboostAvailable: boolean; loadedVersions: string[]; error?: string };
   consumers: ModelConsumerHealth[];
   updatedAt: string;
+  marketActivationMode?: 'off' | 'shadow' | 'on';
+  marketActivations?: ModelMarketActivation[];
+};
+
+export type ModelMarketActivation = {
+  id: string;
+  consumer: 'BETCLAW' | 'POLYCLAW';
+  marketType: 'O15' | 'O25' | 'U35' | 'U45';
+  candidateVersion: string | null;
+  activeVersion: string | null;
+  promotionsPaused: boolean;
+  rolloutPercent: number;
+  pauseReason?: string | null;
+  candidateSince?: string | null;
+  activatedAt?: string | null;
+  rolloutChangedAt?: string | null;
+  performance?: {
+    forecasts: number;
+    settledForecasts: number;
+    mappingErrors: number;
+    ensembleBrier: number | null;
+    bookmakerBrier: number | null;
+    heuristicBrier: number | null;
+    policyRoi: number | null;
+  } | null;
 };

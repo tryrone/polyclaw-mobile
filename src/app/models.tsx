@@ -1,13 +1,18 @@
-import { CheckCircle2, CircleAlert, CircleDashed, Clock3, Cpu, Database, ShieldX } from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+import { CheckCircle2, CircleAlert, CircleDashed, Clock3, Cpu, Database, ShieldX } from '@/components/modern-icons';
+import type { LucideIcon } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { DetailScreen } from '@/components/detail-layout';
 import { Card, EmptyState, ResourceState, StatusPill } from '@/components/ui-kit';
 import { useOperatorResource } from '@/hooks/use-operator-resource';
-import type { ModelConsumerHealth, ModelMarketMetrics, ModelsData } from '@/lib/types';
+import type { ModelConsumerHealth, ModelMarketActivation, ModelMarketMetrics, ModelsData } from '@/lib/types';
 import { fonts, spacing, usePolyClawTheme } from '@/theme';
 
 const MARKETS = ['O15', 'O25', 'U35', 'U45'] as const;
+type MarketActivationMode = NonNullable<ModelsData['marketActivationMode']>;
+
+function consumerStatusLabel(status: ModelConsumerHealth['status']) {
+  return status === 'SHADOW' ? 'RESEARCH ONLY' : status;
+}
 
 function score(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? '—' : value.toFixed(3);
@@ -52,14 +57,15 @@ export default function ModelsScreen() {
   const consumer = resource.data?.consumers.find((item) => item.consumer === 'POLYCLAW') ?? null;
   const artifact = consumer?.candidate ?? consumer?.active ?? null;
   const metrics = artifact?.metrics.markets ?? {};
+  const marketActivations = resource.data?.marketActivations?.filter((item) => item.consumer === 'POLYCLAW') ?? [];
   return <DetailScreen title="Models" eyebrow="READ-ONLY MONITOR">
     <ResourceState loading={resource.loading} error={resource.error} stale={resource.stale} />
     {consumer ? <>
-      <Card accessible accessibilityLabel={`PolyClaw model status ${consumer.status}`}>
+      <Card accessible accessibilityLabel={`PolyClaw model status ${consumerStatusLabel(consumer.status)}`}>
         <View style={styles.statusRow}>
           <StatusIcon status={consumer.status} />
           <View style={styles.flex}>
-            <Text style={[styles.statusTitle, { color: theme.text }]}>{consumer.status}</Text>
+            <Text style={[styles.statusTitle, { color: theme.text }]}>{consumerStatusLabel(consumer.status)}</Text>
             <Text style={[styles.detail, { color: theme.textMuted }]}>
               {consumer.status === 'SHADOW' ? 'Predictions are recorded but do not change paper selections.' : consumer.status === 'ELIGIBLE' ? 'All gates pass; an administrator must still promote manually.' : consumer.status === 'ACTIVE' ? 'The ensemble is applied to paper decisions only.' : consumer.status === 'FALLBACK' ? 'BetClaw is using the prior safe probability.' : 'New paper positions fail closed until model evidence is healthy.'}
             </Text>
@@ -67,6 +73,19 @@ export default function ModelsScreen() {
           <StatusPill label={resource.data?.service.status.toUpperCase() ?? 'UNKNOWN'} tone={resource.data?.service.status === 'healthy' ? 'success' : 'danger'} />
         </View>
       </Card>
+
+      <View>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Market activation</Text>
+        <Text style={[styles.detail, { color: theme.textMuted, marginTop: 4 }]}>Each market moves independently from shadow evidence to a manually controlled paper canary.</Text>
+      </View>
+      <View style={styles.marketGrid}>
+        {marketActivations.length ? marketActivations.map((activation) => <ActivationCard activation={activation} activationMode={resource.data?.marketActivationMode ?? 'off'} key={activation.id} />) : (
+          <Card style={styles.activationEmpty}>
+            <Text style={[styles.componentName, { color: theme.text }]}>Market-scoped rollout is {resource.data?.marketActivationMode ?? 'off'}</Text>
+            <Text style={[styles.detail, { color: theme.textMuted }]}>No PolyClaw market activation rows are available. Legacy consumer-level evidence remains visible below.</Text>
+          </Card>
+        )}
+      </View>
 
       <View style={styles.componentGrid}>
         <ComponentCard icon={Database} name="Dixon–Coles" version={artifact?.componentVersions?.dixonColes ?? 'dixon-coles-v1'} detail={`${artifact?.metadata.dixonMatches ?? 0} settled fixtures · Brier ${score(artifact?.metrics.overall?.dixonColesBrier)} · SHA ${hash(artifact?.components?.dixonColes?.artifactSha256)}`} healthy={Boolean(artifact)} />
@@ -113,9 +132,33 @@ function ComponentCard({ icon: Icon, name, version, detail, healthy }: { icon: L
   </Card>;
 }
 
+function ActivationCard({ activation, activationMode }: { activation: ModelMarketActivation; activationMode: MarketActivationMode }) {
+  const { theme } = usePolyClawTheme();
+  const status = activationMode === 'off'
+    ? 'DISABLED'
+    : activation.promotionsPaused
+      ? 'PAUSED'
+      : activationMode === 'shadow'
+        ? 'RESEARCH ONLY'
+        : activation.activeVersion && activation.rolloutPercent > 0
+          ? 'ACTIVE'
+          : activation.candidateVersion
+            ? 'RESEARCH ONLY'
+            : 'BLOCKED';
+  const tone = status === 'ACTIVE' ? 'success' : status === 'BLOCKED' || status === 'PAUSED' ? 'danger' : 'warning';
+  const performance = activation.performance;
+  return <Card style={styles.activationCard} accessible accessibilityLabel={`${activation.marketType} ${status}, ${activation.rolloutPercent} percent rollout`}>
+    <View style={styles.marketHead}><Text style={[styles.marketTitle, { color: theme.text }]}>{activation.marketType.replace('O', 'Over ').replace('U', 'Under ').replace('15', '1.5').replace('25', '2.5').replace('35', '3.5').replace('45', '4.5')}</Text><StatusPill label={status} tone={tone} /></View>
+    <Text style={[styles.version, { color: theme.textSoft }]}>{activation.activeVersion ?? activation.candidateVersion ?? 'No verified artifact'}</Text>
+    <MetricRow label="Paper rollout" left={`${activation.rolloutPercent}%`} right={`${performance?.settledForecasts ?? 0} settled`} accent={status === 'ACTIVE'} />
+    <MetricRow label="Ensemble Brier" left={score(performance?.ensembleBrier)} right={`ROI ${performance?.policyRoi == null ? '—' : `${(performance.policyRoi * 100).toFixed(1)}%`}`} />
+    {activation.pauseReason ? <Text style={[styles.detail, { color: theme.danger }]}>{activation.pauseReason}</Text> : null}
+  </Card>;
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 }, statusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, statusTitle: { fontFamily: fonts.bold, fontSize: 20, marginBottom: 5 }, detail: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
-  componentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, componentCard: { minWidth: 165, flexBasis: '47%', flexGrow: 1, gap: 7 }, componentTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 }, componentName: { fontFamily: fonts.semibold, fontSize: 14 }, version: { fontFamily: fonts.medium, fontSize: 11 },
+  componentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, componentCard: { minWidth: 165, flexBasis: '47%', flexGrow: 1, gap: 7 }, componentTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 }, componentName: { fontFamily: fonts.semibold, fontSize: 14 }, version: { fontFamily: fonts.medium, fontSize: 11 }, activationCard: { minWidth: 240, flexBasis: '47%', flexGrow: 1, gap: 7 }, activationEmpty: { flexGrow: 1 },
   sectionTitle: { fontFamily: fonts.bold, fontSize: 17 }, gateList: { marginTop: 12 }, gate: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 10 }, gateTitle: { fontFamily: fonts.semibold, fontSize: 13, textTransform: 'capitalize', marginBottom: 2 },
   marketGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, marketCard: { minWidth: 240, flexBasis: '47%', flexGrow: 1 }, marketHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 }, marketTitle: { fontFamily: fonts.bold, fontSize: 15 }, sample: { fontFamily: fonts.medium, fontSize: 11 }, columnHead: { fontFamily: fonts.medium, fontSize: 10, textAlign: 'right', marginTop: 12 }, metricRow: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, metricLabel: { fontFamily: fonts.regular, fontSize: 12 }, metricValue: { fontFamily: fonts.semibold, fontSize: 12 },
   trendTable: { marginTop: 12 }, trendRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 8 }, trendVersion: { fontFamily: fonts.medium, fontSize: 12 }, trendScore: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'right' },
