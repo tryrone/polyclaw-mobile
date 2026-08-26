@@ -39,6 +39,36 @@ export type ConsumerDashboard = {
   release: { activationRequiresInvite: boolean };
 };
 
+export type ConsumerMode = 'PAPER' | 'LIVE_LOCKED' | 'LIVE';
+export type ConsumerPortfolioPoint = { at: string; equityUsdc: number; tradingPnlUsdc: number; returnFraction: number; drawdownFraction: number; source: 'BOT' | 'MANUAL' | 'COMBINED' };
+export type ConsumerManualOrder = {
+  id: string; fixtureLabel: string; marketLabel: string; selectionLabel: string; kickoff: string; limitPrice: number;
+  requestedStakeUsdc: number; approvedStakeUsdc: number; estimatedShares: number; maximumLossUsdc: number;
+  possiblePayoutUsdc: number; estimatedFeeUsdc: number; quoteTakenAt: string; quoteExpiresAt: string; status: string; mode: ConsumerMode;
+  rejectionReasons?: string[] | null; walletSigningPayload?: string | null;
+};
+export type ConsumerPortfolio = {
+  range: '1W' | '1M' | '3M' | 'ALL'; source: 'BOT' | 'MANUAL' | 'COMBINED'; mode: ConsumerMode;
+  summary: { equityUsdc: number; tradingPnlUsdc: number; returnFraction: number; drawdownFraction: number; realizedPnlUsdc: number; unrealizedPnlUsdc: number; feesUsdc: number };
+  budgets: { botBudgetUsdc: number; manualBudgetUsdc: number; unallocatedUsdc: number };
+  positions: ConsumerDashboard['positions']; manualOrders: ConsumerManualOrder[];
+  polymarketPositions: { asset?: string; conditionId?: string; size?: number; avgPrice?: number; currentValue?: number; cashPnl?: number; realizedPnl?: number; curPrice?: number; title?: string; outcome?: string; endDate?: string; redeemable?: boolean }[];
+  series: ConsumerPortfolioPoint[];
+};
+export type ConsumerFootballMarket = {
+  eventId: string; marketId: string; conditionId: string; tokenId: string; sport: 'football'; eventTitle: string; question: string;
+  marketLabel: string; selectionLabel: string; kickoff: string; active: boolean; closed: boolean; acceptingOrders: boolean;
+  competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null; liquidityUsdc: number;
+};
+export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
+export type ConsumerAccount = {
+  mode: ConsumerMode; readOnlyAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; eligibilityCode?: string | null;
+  approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
+  notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
+  approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
+  funding: { depositUrl: string | null; withdrawalUrl: string | null };
+};
+
 export type Trade = {
   id: string;
   clientOrderId: string;

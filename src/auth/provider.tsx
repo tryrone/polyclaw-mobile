@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser } from '@/lib/api';
+import { consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser, type ConsumerProcedure } from '@/lib/api';
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import { signInWithGoogle as googleSignIn } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
@@ -19,7 +19,7 @@ type AuthValue = {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   request: <T>(path: string, init?: { method?: 'POST'; body?: Record<string, unknown>; idempotencyKey?: string }) => Promise<OperatorEnvelope<T>>;
-  consumer: <T>(procedure: 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'createKoraCheckout', input?: Record<string, unknown>) => Promise<T>;
+  consumer: <T>(procedure: ConsumerProcedure, input?: Record<string, unknown>) => Promise<T>;
 };
 
 const Context = createContext<AuthValue | null>(null);
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return next;
   }, [save, session]);
 
-  const consumer = useCallback(async <T,>(procedure: 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'createKoraCheckout', input?: Record<string, unknown>) => {
+  const consumer = useCallback(async <T,>(procedure: ConsumerProcedure, input?: Record<string, unknown>) => {
     const active = await freshSession();
     try { return await consumerRequest<T>(active.accessToken, procedure, input); }
     catch (error) {

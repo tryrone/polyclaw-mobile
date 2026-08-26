@@ -1,15 +1,15 @@
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { ClockCounterClockwise, House, Robot, UserCircle, Wallet, type Icon } from 'phosphor-react-native';
+import { ChartLineUp, ClockCounterClockwise, House, Robot, UserCircle, type Icon } from 'phosphor-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/auth/provider';
 import { fonts, radius, spacing, usePolyClawTheme } from '@/theme';
 
-const tabs: { name: string; href: '/home' | '/bot' | '/activity' | '/wallet' | '/account'; label: string; Icon: Icon }[] = [
-  { name: 'home', href: '/home', label: 'Home', Icon: House },
+const tabs: { name: string; href: '/home' | '/bot' | '/portfolio' | '/activity' | '/account'; label: string; Icon: Icon }[] = [
+  { name: 'home', href: '/home', label: 'Overview', Icon: House },
   { name: 'bot', href: '/bot', label: 'Bot', Icon: Robot },
+  { name: 'portfolio', href: '/portfolio', label: 'Portfolio', Icon: ChartLineUp },
   { name: 'activity', href: '/activity', label: 'Activity', Icon: ClockCounterClockwise },
-  { name: 'wallet', href: '/wallet', label: 'Wallet', Icon: Wallet },
   { name: 'account', href: '/account', label: 'Account', Icon: UserCircle },
 ];
 
@@ -24,7 +24,7 @@ function ConsumerTabBar() {
         const selected = pathname === href;
         return <Pressable key={href} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => router.navigate(href)} style={[styles.tab, selected && { backgroundColor: theme.accentSoft }]}>
           <Icon size={22} color={selected ? theme.accent : theme.textMuted} weight={selected ? 'fill' : 'regular'} />
-          {selected ? <Text numberOfLines={1} style={[styles.label, { color: theme.accent }]}>{label}</Text> : null}
+          <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.label, { color: selected ? theme.accent : theme.textMuted }]}>{label}</Text>
         </Pressable>;
       })}
     </View>
@@ -40,6 +40,6 @@ export default function ConsumerLayout() {
 const styles = StyleSheet.create({
   host: { bottom: 0, left: spacing.lg, position: 'absolute', right: spacing.lg },
   bar: { alignItems: 'center', borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, elevation: 10, flexDirection: 'row', minHeight: 62, padding: 6, shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.2, shadowRadius: 18 },
-  tab: { alignItems: 'center', borderRadius: radius.md, flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 48, minWidth: 48, paddingHorizontal: 8 },
-  label: { fontFamily: fonts.bold, fontSize: 11 },
+  tab: { alignItems: 'center', borderRadius: radius.md, flex: 1, gap: 3, justifyContent: 'center', minHeight: 52, minWidth: 48, paddingHorizontal: 2 },
+  label: { fontFamily: fonts.bold, fontSize: 9.5 },
 });

@@ -10,6 +10,7 @@ import { NotificationBootstrap } from '@/notifications/bootstrap';
 import { UnlockView } from '@/components/unlock-view';
 
 SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 500, fade: true });
 
 function AuthenticatedStack() {
   const { state, session, biometricEnabled } = useAuth();
@@ -21,7 +22,7 @@ function AuthenticatedStack() {
   useEffect(() => {
     if (state === 'hydrating') return;
     const inOnboarding = pathname === '/welcome' || pathname === '/sign-in' || pathname === '/sign-up';
-    const inConsumer = ['/home', '/bot', '/activity', '/wallet', '/account'].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+    const inConsumer = ['/home', '/bot', '/portfolio', '/activity', '/account', '/football-trade'].some((route) => pathname === route || pathname.startsWith(`${route}/`));
     if (state === 'anonymous' && !inOnboarding) router.replace('/welcome' as never);
     if (state === 'authenticated' && inOnboarding) router.replace(session?.user.role === 'ADMIN' ? '/' : '/home');
     if (state === 'authenticated' && session?.user.role !== 'ADMIN' && !inOnboarding && !inConsumer) router.replace('/home');
@@ -39,7 +40,7 @@ function AuthenticatedStack() {
 
 export default function RootLayout() {
   const [loaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Manrope_700Bold, Manrope_800ExtraBold });
-  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
+  useEffect(() => { if (loaded) SplashScreen.hide(); }, [loaded]);
   if (!loaded) return null;
   return <PolyClawThemeProvider><AuthProvider><NotificationBootstrap /><AuthenticatedStack /></AuthProvider></PolyClawThemeProvider>;
 }

@@ -45,9 +45,13 @@ export async function logoutUser(session: AuthSession) {
   await client(session.accessToken).auth.mobileLogout.mutate({ accessToken: session.accessToken, refreshToken: session.refreshToken });
 }
 
-export async function consumerRequest<T>(accessToken: string, procedure: 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'createKoraCheckout', input?: Record<string, unknown>): Promise<T> {
+export type ConsumerProcedure = 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'portfolio' | 'footballMarkets' | 'quoteManualOrder' | 'submitManualOrder' | 'cancelManualOrder' | 'account' | 'createWalletChallenge' | 'verifyWalletOwnership' | 'beginDepositWallet' | 'updateBudgets' | 'submitLiveReview' | 'updateNotifications' | 'renewSigner' | 'revokeSigner' | 'disconnectWallet' | 'requestOffboarding';
+
+const consumerQueries = new Set<ConsumerProcedure>(['dashboard', 'portfolio', 'footballMarkets', 'account']);
+
+export async function consumerRequest<T>(accessToken: string, procedure: ConsumerProcedure, input?: Record<string, unknown>): Promise<T> {
   const endpoint = client(accessToken).polyClawConsumer[procedure];
-  return (procedure === 'dashboard' ? endpoint.query() : endpoint.mutate(input ?? {})) as Promise<T>;
+  return (consumerQueries.has(procedure) ? endpoint.query(input) : endpoint.mutate(input ?? {})) as Promise<T>;
 }
 
 export async function registerPushToken(accessToken: string, expoPushToken: string) {
