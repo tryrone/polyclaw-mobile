@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { ArrowLeft, CheckCircle, SoccerBall } from 'phosphor-react-native';
 import { useAuth } from '@/auth/provider';
 import { ActionButton, Card, Header, money, ResourceState, Screen, SectionHeading, shortDate, StatusPill } from '@/components/ui-kit';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
 import type { ConsumerFootballCatalogue, ConsumerFootballMarket, ConsumerManualOrder, ConsumerPortfolio } from '@/lib/types';
+import { features } from '@/lib/features';
 import { fonts, radius, spacing, usePolyClawTheme } from '@/theme';
 
 function uuid() {
@@ -15,7 +16,12 @@ function uuid() {
   });
 }
 
-export default function FootballTradeScreen() {
+export default function FootballTradeRoute() {
+  if (!features.manualFootballTrading) return <Redirect href="/home" />;
+  return <FootballTradeScreen />;
+}
+
+function FootballTradeScreen() {
   const { theme } = usePolyClawTheme();
   const { consumer } = useAuth();
   const [query, setQuery] = useState(''); const [competition, setCompetition] = useState(''); const [country, setCountry] = useState(''); const [date, setDate] = useState('');
