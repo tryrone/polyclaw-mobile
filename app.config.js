@@ -1,5 +1,3 @@
-const base = require('./app.json');
-
 const easProjectId = 'c162f4a8-1f69-4cbf-be9a-e2fd1a5db083';
 
 function requestedPlatform() {
@@ -14,30 +12,28 @@ function googlePlugin() {
   return iosUrlScheme ? [['react-native-nitro-google-signin', { iosUrlScheme }]] : [];
 }
 
-module.exports = {
-  ...base,
-  expo: {
-    ...base.expo,
-    updates: {
-      ...(base.expo.updates ?? {}),
-      url: `https://u.expo.dev/${easProjectId}`,
-    },
-    runtimeVersion: {
-      policy: 'appVersion',
-    },
-    extra: {
-      ...(base.expo.extra ?? {}),
-      apiUrl: process.env.EXPO_PUBLIC_API_URL,
-      expoProjectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID,
-      googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      eas: {
-        projectId: easProjectId,
-      },
-    },
-    plugins: [
-      ...(base.expo.plugins ?? []),
-      ...googlePlugin(),
-    ],
+module.exports = ({ config }) => ({
+  ...config,
+  updates: {
+    ...(config.updates ?? {}),
+    url: `https://u.expo.dev/${easProjectId}`,
   },
-};
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  extra: {
+    ...(config.extra ?? {}),
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
+    expoProjectId: process.env.EXPO_PUBLIC_EXPO_PROJECT_ID,
+    googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    eas: {
+      projectId: easProjectId,
+    },
+  },
+  plugins: [
+    ...(config.plugins ?? []),
+    './plugins/with-ios-version-sync',
+    ...googlePlugin(),
+  ],
+});

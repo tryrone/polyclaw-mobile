@@ -1,6 +1,6 @@
 # PolyClaw Mobile
 
-Standalone Expo SDK 56 operator application for monitoring PolyClaw paper and live trading. This is intentionally separate from betclaw-mobile.
+Standalone Expo SDK 57 operator application for monitoring PolyClaw paper and live trading. This is intentionally separate from betclaw-mobile.
 
 ## Operator capabilities
 

@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/auth/provider';
 import { PolyClawThemeProvider, usePolyClawTheme } from '@/theme';
 import { NotificationBootstrap } from '@/notifications/bootstrap';
 import { UnlockView } from '@/components/unlock-view';
+import { features } from '@/lib/features';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
@@ -22,7 +23,8 @@ function AuthenticatedStack() {
   useEffect(() => {
     if (state === 'hydrating') return;
     const inOnboarding = pathname === '/welcome' || pathname === '/sign-in' || pathname === '/sign-up';
-    const inConsumer = ['/home', '/bot', '/portfolio', '/activity', '/account', '/football-trade'].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+    const consumerRoutes = ['/home', '/bot', '/portfolio', '/activity', '/account', ...(features.manualFootballTrading ? ['/football-trade'] : [])];
+    const inConsumer = consumerRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
     if (state === 'anonymous' && !inOnboarding) router.replace('/welcome' as never);
     if (state === 'authenticated' && inOnboarding) router.replace(session?.user.role === 'ADMIN' ? '/' : '/home');
     if (state === 'authenticated' && session?.user.role !== 'ADMIN' && !inOnboarding && !inConsumer) router.replace('/home');
