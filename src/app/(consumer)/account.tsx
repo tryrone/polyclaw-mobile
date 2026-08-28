@@ -6,6 +6,7 @@ import { SubscriptionItem, WalletItem } from '@/features/account/membership-item
 import { AccountMessageBanner, AccountProfile, SettingsGroup } from '@/features/account/primitives';
 import { AppearanceItem, NotificationItem } from '@/features/account/preference-items';
 import { AccountControlsItem, SafetyItem } from '@/features/account/security-items';
+import { EducationItem } from '@/features/account/education-item';
 import { accountStyles as styles } from '@/features/account/styles';
 import { useAccountController } from '@/features/account/use-account-controller';
 import { usePolyClawTheme } from '@/theme';
@@ -25,7 +26,7 @@ export default function ConsumerAccountScreen() {
         }
       />
       <ResourceState loading={controller.resource.loading} error={controller.resource.error} />
-      <AccountProfile name={controller.profile.name} email={controller.profile.email} />
+      <AccountProfile name={controller.profile.name} email={controller.profile.email} userId={controller.profile.id} />
       <AccountMessageBanner message={controller.ui.message} />
 
       <SettingsGroup title="Membership & trading">
@@ -38,6 +39,10 @@ export default function ConsumerAccountScreen() {
       <SettingsGroup title="Preferences">
         <NotificationItem controller={controller} />
         <AppearanceItem controller={controller} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Help & education">
+        <EducationItem controller={controller} />
       </SettingsGroup>
 
       <SettingsGroup title="Security & account">

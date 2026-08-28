@@ -9,5 +9,5 @@ export function requiresMandatoryBiometric(input: { role: 'USER' | 'ADMIN'; pilo
 }
 
 export function recoveryBlocksProcedure(procedure: string) {
-  return new Set(['grantPilotAccess', 'revokePilotAccess', 'approveLiveAccount', 'denyLiveAccount', 'revokeLiveAccount', 'releaseCanaryIntent', 'resetCanaryAttempt', 'renewSigner', 'authorizeBotSigner', 'prepareLiveActivation', 'enableLiveBot']).has(procedure);
+  return new Set(['grantPilotAccess', 'revokePilotAccess', 'addPilotMembership', 'revokePilotMembership', 'approveLiveAccount', 'denyLiveAccount', 'revokeLiveAccount', 'releaseCanaryIntent', 'resetCanaryAttempt', 'renewSigner', 'authorizeBotSigner', 'prepareLiveActivation', 'enableLiveBot']).has(procedure);
 }

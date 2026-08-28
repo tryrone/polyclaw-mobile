@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { CaretDown, CaretRight, CheckCircle, Info, type Icon } from 'phosphor-react-native';
+import { CopyableUserId } from '@/components/copyable-user-id';
 import { PressableScale } from '@/components/motion';
 import { usePolyClawTheme } from '@/theme';
 import { accountStyles as styles } from './styles';
 import type { AccountMessage } from './types';
 
-export function AccountProfile({ name, email }: { name?: string | null; email?: string | null }) {
+export function AccountProfile({ name, email, userId }: { name?: string | null; email?: string | null; userId?: string | null }) {
   const { theme } = usePolyClawTheme();
   const displayName = name || 'PolyClaw member';
   return (
@@ -17,6 +18,7 @@ export function AccountProfile({ name, email }: { name?: string | null; email?: 
       <View style={styles.flex}>
         <Text style={[styles.profileName, { color: theme.text }]}>{displayName}</Text>
         <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
+        <CopyableUserId userId={userId} />
       </View>
     </View>
   );

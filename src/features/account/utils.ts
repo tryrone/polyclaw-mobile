@@ -54,45 +54,65 @@ export function countEnabledCriticalNotifications(notifications?: ConsumerAccoun
   return notificationPreferences.filter((preference) => preference.critical && notifications[preference.key]).length;
 }
 
-export function buildApprovalChecklist(approval?: ConsumerAccount['approval']): ApprovalChecklistItem[] {
+function lacks(reasons: string[], ...required: string[]) {
+  return required.some((reason) => reasons.includes(reason));
+}
+
+export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalChecklistItem[] {
+  const approval = account?.approval;
+  const botReasons = approval?.botReasons ?? [];
+  const reviewReasons = approval?.reviewMissingReasons ?? [];
+  const accessDetail = account?.access.active
+    ? account.access.pilotGrant?.expiresAt
+      ? `Active until ${new Date(account.access.pilotGrant.expiresAt).toLocaleDateString()}`
+      : 'Active access confirmed'
+    : account?.access.mode === 'SUBSCRIPTION'
+      ? 'An active subscription is required for new bot positions'
+      : account?.access.pilotRequest?.status === 'PENDING'
+      ? 'Renewal request is waiting for an admin'
+      : 'Request a pilot grant to continue';
   return [
     {
-      label: 'Invitation and disclosures',
-      passed: Boolean(
-        approval &&
-          !approval.manualReasons.includes('invite_required') &&
-          !approval.manualReasons.includes('adult_confirmation_required') &&
-          !approval.manualReasons.includes('risk_disclosure_required'),
-      ),
+      id: 'access',
+      label: account?.access.mode === 'SUBSCRIPTION' ? 'Active subscription access' : 'Active pilot access',
+      detail: accessDetail,
+      passed: Boolean(account?.access.active),
     },
     {
+      id: 'disclosures',
+      label: 'Invitation and disclosures',
+      detail: 'Invitation, age confirmation, and trading-risk disclosure',
+      passed: Boolean(approval && !lacks(botReasons, 'invite_required', 'adult_confirmation_required', 'risk_disclosure_required')),
+    },
+    {
+      id: 'paper',
       label: `Paper history (${approval?.paperDays ?? 0}/7 days, ${approval?.settledBotPositions ?? 0}/10 positions)`,
+      detail: 'Build a seven-day, ten-position qualification record',
       passed: Boolean(approval && approval.paperDays >= 7 && approval.settledBotPositions >= 10),
     },
     {
+      id: 'eligibility',
       label: 'Eligible location and risk quiz',
-      passed: Boolean(
-        approval &&
-          !approval.manualReasons.includes('jurisdiction_not_eligible') &&
-          !approval.manualReasons.includes('risk_quiz_required'),
-      ),
+      detail: 'Location must remain eligible; complete the acknowledgements below',
+      passed: Boolean(approval && !lacks(botReasons, 'jurisdiction_not_eligible', 'risk_quiz_required')),
     },
     {
-      label: 'Funded Deposit Wallet',
-      passed: Boolean(
-        approval &&
-          !approval.manualReasons.includes('deposit_wallet_required') &&
-          !approval.manualReasons.includes('funded_wallet_required'),
-      ),
+      id: 'wallet',
+      label: 'Dedicated wallet, funding, and withdrawal test',
+      detail: 'Approve the bot wallet, hold $15–$25 pUSD, then confirm the $1 test withdrawal',
+      passed: Boolean(approval && !lacks(reviewReasons, 'deposit_wallet_not_funded', 'pilot_wallet_balance_out_of_range', 'owner_withdrawal_test_required', 'deposit_wallet_approvals_pending')),
     },
     {
+      id: 'approval',
       label: 'Admin, engine and platform approval',
-      passed: Boolean(
-        approval &&
-          !approval.manualReasons.includes('admin_approval_required') &&
-          !approval.manualReasons.includes('global_engine_not_approved') &&
-          !approval.manualReasons.includes('platform_not_approved'),
-      ),
+      detail: account?.approvalStatus === 'PENDING_REVIEW' ? 'Your evidence is waiting for an operator decision' : 'Approval is tied to the exact wallet evidence reviewed',
+      passed: Boolean(approval && account?.approvalStatus === 'APPROVED' && approval.globalEngineApproved && approval.platformApproved),
+    },
+    {
+      id: 'signer',
+      label: '30-day bot authorization',
+      detail: 'Passkey authorization can trade and close, but cannot withdraw',
+      passed: Boolean(account?.signerStatus === 'ACTIVE' && account.signerExpiresAt && new Date(account.signerExpiresAt) > new Date()),
     },
   ];
 }

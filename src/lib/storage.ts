@@ -5,6 +5,15 @@ import type { AuthSession } from './types';
 
 const KEY = 'polyclaw.operator.session';
 const BIOMETRIC_KEY = 'polyclaw.biometric.enabled';
+const GUIDE_KEY_PREFIX = 'polyclaw.consumer-guide.completed';
+
+export async function readConsumerGuideCompleted(userId: string): Promise<boolean> {
+  try { return (await AsyncStorage.getItem(`${GUIDE_KEY_PREFIX}.${userId}`)) === 'true'; } catch { return false; }
+}
+
+export async function writeConsumerGuideCompleted(userId: string) {
+  await AsyncStorage.setItem(`${GUIDE_KEY_PREFIX}.${userId}`, 'true').catch(() => undefined);
+}
 
 export async function readBiometricEnabled(): Promise<boolean> {
   try { return (await AsyncStorage.getItem(BIOMETRIC_KEY)) === 'true'; } catch { return false; }

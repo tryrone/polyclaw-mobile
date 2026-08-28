@@ -18,6 +18,8 @@ describe('PolyClaw biometric policy', () => {
   it('keeps exits and withdrawals available in recovery while blocking expansion', () => {
     assert.equal(recoveryBlocksProcedure('enableLiveBot'), true);
     assert.equal(recoveryBlocksProcedure('approveLiveAccount'), true);
+    assert.equal(recoveryBlocksProcedure('addPilotMembership'), true);
+    assert.equal(recoveryBlocksProcedure('revokePilotMembership'), true);
     assert.equal(recoveryBlocksProcedure('prepareClosePosition'), false);
     assert.equal(recoveryBlocksProcedure('prepareOwnerAction'), false);
   });
