@@ -62,10 +62,10 @@ export function ApprovalItem({ controller }: { controller: AccountController }) 
         label="Submit for live review"
         variant="secondary"
         loading={ui.busy === 'review'}
-        disabled={(approval.riskQuizRequired && !approval.allRiskAcknowledged) || (ui.isBusy && ui.busy !== 'review')}
+        disabled={ui.readOnly || (approval.riskQuizRequired && !approval.allRiskAcknowledged) || (ui.isBusy && ui.busy !== 'review')}
         onPress={() => void approval.submitReview()}
       />
-      <Text style={[styles.footnote, { color: theme.textMuted }]}>A subscription alone can never unlock live trading.</Text>
+      <Text style={[styles.footnote, { color: theme.textMuted }]}>During the internal pilot, an active grant and exact operator approval replace subscription access.</Text>
     </AccountItem>
   );
 }
@@ -88,18 +88,34 @@ export function SignerItem({ controller }: { controller: AccountController }) {
         This CLOB-only authorization can place approved bot orders. It cannot withdraw funds.
       </Text>
       <View style={styles.actionStack}>
+        {signer.account?.mode === 'LIVE' ? (
+          <ActionButton
+            label="Pause live bot"
+            variant="secondary"
+            loading={ui.busy === 'disable'}
+            disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'disable')}
+            onPress={() => void signer.disable()}
+          />
+        ) : signer.account?.signerStatus === 'ACTIVE' ? (
+          <ActionButton
+            label="Enable Live Bot"
+            loading={ui.busy === 'enable'}
+            disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'enable')}
+            onPress={() => void signer.enable()}
+          />
+        ) : null}
         <ActionButton
           label="Renew authorization"
           variant="secondary"
           loading={ui.busy === 'renew'}
-          disabled={ui.isBusy && ui.busy !== 'renew'}
+          disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'renew')}
           onPress={() => void signer.renew()}
         />
         <ActionButton
           label="Emergency revoke"
           variant="danger"
           loading={ui.busy === 'revoke'}
-          disabled={ui.isBusy && ui.busy !== 'revoke'}
+          disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'revoke')}
           onPress={() => void signer.revoke()}
         />
       </View>

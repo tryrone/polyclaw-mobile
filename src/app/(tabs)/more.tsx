@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
-import { Bell, BrainCircuit, Cable, ChevronRight, ClipboardCheck, ClipboardList, LogOut, Moon, ShieldAlert, Sun } from '@/components/modern-icons';
+import { Bell, BrainCircuit, Cable, ChevronRight, ClipboardCheck, ClipboardList, LogOut, Moon, ShieldAlert, ShieldCheck, Sun } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/provider';
 import { haptics, PressableScale } from '@/components/motion';
 import { ActionButton, Card, Header, Screen } from '@/components/ui-kit';
 import { fonts, usePolyClawTheme } from '@/theme';
 
-const links = [{ label: 'Models', detail: 'Shared ensemble health and shadow gates', route: '/models', icon: BrainCircuit }, { label: 'Risk controls', detail: 'Limits, halt state and mode', route: '/risk', icon: ShieldAlert }, { label: 'Connections', detail: 'Venue and research health', route: '/connections', icon: Cable }, { label: 'Manual bets', detail: 'SportyBet handoff and confirmation', route: '/manual-bets', icon: ClipboardCheck }, { label: 'Alerts', detail: 'Operational warnings', route: '/alerts', icon: Bell }, { label: 'Audit log', detail: 'Operator action history', route: '/audit', icon: ClipboardList }];
+const links = [{ label: 'Models', detail: 'Shared ensemble health and shadow gates', route: '/models', icon: BrainCircuit }, { label: 'Risk controls', detail: 'Limits, halt state and mode', route: '/risk', icon: ShieldAlert }, { label: 'Live account review', detail: 'Identity, wallet, funding and approval evidence', route: '/live-review', icon: ShieldCheck }, { label: 'Connections', detail: 'Venue and research health', route: '/connections', icon: Cable }, { label: 'Manual bets', detail: 'SportyBet handoff and confirmation', route: '/manual-bets', icon: ClipboardCheck }, { label: 'Alerts', detail: 'Operational warnings', route: '/alerts', icon: Bell }, { label: 'Audit log', detail: 'Operator action history', route: '/audit', icon: ClipboardList }];
 
 export default function MoreScreen() {
   const { theme, preference, setPreference } = usePolyClawTheme(); const { session, signOut } = useAuth();

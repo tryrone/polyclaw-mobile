@@ -4,9 +4,9 @@ import type { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 let configuredUserId: string | null = null;
 
 function apiKey() {
+  if (Platform.OS !== 'ios') throw new Error('PolyClaw subscriptions are disabled on Android for this release.');
   return Platform.select({
     ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY,
-    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
   })?.trim();
 }
 
@@ -30,9 +30,7 @@ async function monthlyPackage(userId: string): Promise<PurchasesPackage> {
   const Purchases = await purchases(userId);
   const offerings = await Purchases.getOfferings();
   const productId = process.env.EXPO_PUBLIC_REVENUECAT_PRODUCT_ID ?? 'polyclaw_bot_monthly';
-  const pack = offerings.current?.availablePackages.find((item) => item.product.identifier === productId)
-    ?? offerings.current?.monthly
-    ?? offerings.current?.availablePackages[0];
+  const pack = offerings.current?.availablePackages.find((item) => item.product.identifier === productId);
   if (!pack) throw new Error('The PolyClaw monthly subscription is not available yet.');
   return pack;
 }

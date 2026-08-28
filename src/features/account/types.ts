@@ -15,9 +15,13 @@ export type BusyOperation =
   | 'challenge'
   | 'verify'
   | 'deposit'
+  | 'approve-wallet'
+  | 'withdrawal'
   | 'review'
   | 'renew'
   | 'revoke'
+  | 'enable'
+  | 'disable'
   | 'notifications'
   | 'disconnect'
   | 'delete';

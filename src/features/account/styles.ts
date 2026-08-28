@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { fonts, radius, spacing } from '@/theme';
+import { fonts, layout, radius, spacing } from '@/theme';
 
 export const accountStyles = StyleSheet.create({
   profileCard: {
@@ -71,12 +71,12 @@ export const accountStyles = StyleSheet.create({
   preference: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 66 },
   preferenceName: { fontFamily: fonts.medium, fontSize: 13 },
   preferenceDetail: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, marginTop: 2 },
-  segmented: { borderRadius: radius.sm, flexDirection: 'row', gap: spacing.xs, padding: spacing.xs },
+  segmented: { borderRadius: layout.controlRadius, flexDirection: 'row', gap: spacing.xs, padding: spacing.xs },
   segmentWrap: { flex: 1 },
   segment: {
     alignItems: 'center',
     borderColor: 'transparent',
-    borderRadius: 8,
+    borderRadius: layout.controlRadius,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 44,

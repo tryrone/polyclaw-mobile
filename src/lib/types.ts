@@ -37,6 +37,7 @@ export type ConsumerDashboard = {
   summary: { dailyExposureUsdc: number; openExposureUsdc: number; openPositions: number; availableBalanceUsdc: number; realizedPnlUsdc: number; equityUsdc: number; drawdownFraction: number };
   riskLimits: { stakeBankrollFraction: number; dailyExposureBankrollFraction: number; maximumDrawdownFraction: number };
   release: { activationRequiresInvite: boolean };
+  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string } | null };
 };
 
 export type ConsumerMode = 'PAPER' | 'LIVE_LOCKED' | 'LIVE';
@@ -52,6 +53,7 @@ export type ConsumerPortfolio = {
   summary: { equityUsdc: number; tradingPnlUsdc: number; returnFraction: number; drawdownFraction: number; realizedPnlUsdc: number; unrealizedPnlUsdc: number; feesUsdc: number };
   budgets: { botBudgetUsdc: number; manualBudgetUsdc: number; unallocatedUsdc: number };
   positions: ConsumerDashboard['positions']; manualOrders: ConsumerManualOrder[];
+  livePositions: { id: string; conditionId: string; tokenId: string; fixtureLabel: string; marketLabel: string; selectionLabel: string; openedStakeUsdc: number; positionShares: number; currentValueUsdc: number; realizedPnlUsdc: number; unrealizedPnlUsdc: number; status: string; openedAt: string }[];
   polymarketPositions: { asset?: string; conditionId?: string; size?: number; avgPrice?: number; currentValue?: number; cashPnl?: number; realizedPnl?: number; curPrice?: number; title?: string; outcome?: string; endDate?: string; redeemable?: boolean }[];
   series: ConsumerPortfolioPoint[];
 };
@@ -62,11 +64,24 @@ export type ConsumerFootballMarket = {
 };
 export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
 export type ConsumerAccount = {
-  mode: ConsumerMode; readOnlyAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; eligibilityCode?: string | null;
+  mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
   notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
   approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
-  funding: { depositUrl: string | null; withdrawalUrl: string | null };
+  funding: { minimumReadyPusd: number; minimumEntryPusd: number };
+  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string; walletCapPusd: number; canaryAttemptsUsed: number; canaryAttemptLimit: number } | null };
+};
+
+export type OwnerActionPreparation = {
+  id: string;
+  typedData: Record<string, unknown>;
+  status: string;
+};
+
+export type DepositSetup = {
+  addresses: { evm?: string; svm?: string; btc?: string; tron?: string; [key: string]: string | undefined };
+  supportedAssets: { chainId: string; assetId?: string; tokenAddress?: string; symbol?: string; name?: string; decimals?: number }[];
+  note: string | null;
 };
 
 export type Trade = {

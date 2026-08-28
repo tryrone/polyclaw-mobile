@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useDerivedValue, withSpring } from 'react-native-reanimated';
 import { useAuth } from '@/auth/provider';
 import { useReducedMotion } from '@/components/motion';
-import { fonts, motion, radius, spacing, usePolyClawTheme } from '@/theme';
+import { fonts, layout, motion, radius, usePolyClawTheme } from '@/theme';
 
 const tabs: { name: string; href: '/home' | '/bot' | '/portfolio' | '/activity' | '/account'; label: string; Icon: Icon }[] = [
   { name: 'home', href: '/home', label: 'Overview', Icon: House },
@@ -52,8 +52,8 @@ export default function ConsumerLayout() {
 }
 
 const styles = StyleSheet.create({
-  host: { bottom: 0, left: spacing.lg, position: 'absolute', right: spacing.lg },
-  bar: { alignItems: 'center', borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, elevation: 10, flexDirection: 'row', minHeight: 62, padding: 6, shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.2, shadowRadius: 18 },
+  host: { bottom: 0, left: layout.phoneGutter, position: 'absolute', right: layout.phoneGutter },
+  bar: { alignItems: 'center', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, elevation: 10, flexDirection: 'row', minHeight: 62, padding: 6, shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.2, shadowRadius: 18 },
   indicator: { bottom: 6, borderRadius: radius.md, left: 6, position: 'absolute', top: 6 },
   tab: { alignItems: 'center', borderRadius: radius.md, flex: 1, gap: 3, justifyContent: 'center', minHeight: 52, minWidth: 48, paddingHorizontal: 2, zIndex: 1 },
   label: { fontFamily: fonts.bold, fontSize: 9.5 },

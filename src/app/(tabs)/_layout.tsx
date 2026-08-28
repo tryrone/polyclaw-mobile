@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptics, useReducedMotion } from '@/components/motion';
-import { fonts, motion, radius, spacing, usePolyClawTheme } from '@/theme';
+import { fonts, layout, motion, radius, usePolyClawTheme } from '@/theme';
 import { useAuth } from '@/auth/provider';
 
 const glassAvailable = isGlassEffectAPIAvailable();
@@ -91,8 +91,8 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: spacing.lg, right: spacing.lg },
-  bar: { borderRadius: radius.lg + 2, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  wrap: { position: 'absolute', left: layout.phoneGutter, right: layout.phoneGutter },
+  bar: { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   glass: { borderColor: 'rgba(167,139,250,0.30)' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 6 },
   tab: { flex: 1, minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 3 },

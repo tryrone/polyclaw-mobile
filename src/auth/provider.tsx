@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { AppState, type AppStateStatus } from 'react-native';
 import { consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser, type ConsumerProcedure } from '@/lib/api';
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import { signInWithGoogle as googleSignIn } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
+import { recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
 
 type AuthState = 'hydrating' | 'anonymous' | 'authenticated';
 type AuthValue = {
@@ -11,8 +13,14 @@ type AuthValue = {
   session: AuthSession | null;
   biometricSupported: boolean;
   biometricEnabled: boolean;
+  biometricRequired: boolean;
+  locked: boolean;
+  recoveryMode: boolean;
+  securityResolved: boolean;
   setBiometricEnabled: (enabled: boolean) => void;
   unlockWithBiometric: () => Promise<boolean>;
+  markUnlocked: () => void;
+  beginRecoveryReauthentication: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: { email: string; password: string; name: string }) => Promise<void>;
   signInWithApple: (input: { identityToken: string; givenName?: string; familyName?: string }) => Promise<void>;
@@ -29,6 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricRequired, setBiometricRequired] = useState(false);
+  const [locked, setLocked] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [securityResolved, setSecurityResolved] = useState(false);
+  const backgroundedAt = useRef<number | null>(null);
+  const recoveryPending = useRef(false);
 
   useEffect(() => {
     Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]).then(([hardware, enrolled]) => setBiometricSupported(hardware && enrolled)).catch(() => undefined);
@@ -38,6 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const save = useCallback(async (next: AuthSession | null) => {
     setSession(next);
     setState(next ? 'authenticated' : 'anonymous');
+    setSecurityResolved(!next);
+    setLocked(Boolean(next) && !recoveryPending.current);
+    if (next && recoveryPending.current) {
+      recoveryPending.current = false;
+      setRecoveryMode(true);
+      setLocked(false);
+    } else if (!next) setRecoveryMode(false);
     await writeSession(next);
   }, []);
 
@@ -51,6 +72,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => save(null));
   }, [save]);
 
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    consumerRequest<{ depositWalletAddress?: string | null; walletLifecycle?: string; access?: { pilotGrant?: { status?: string } | null } }>(session.accessToken, 'account')
+      .then((account) => {
+        if (!active) return;
+        const required = requiresMandatoryBiometric({ role: session.user.role, pilotGrantStatus: account.access?.pilotGrant?.status, depositWalletAddress: account.depositWalletAddress, walletLifecycle: account.walletLifecycle });
+        setBiometricRequired(required);
+        if (required) setBiometricEnabledState(true);
+      })
+      .catch(() => { if (active) setBiometricRequired(true); })
+      .finally(() => { if (active) setSecurityResolved(true); });
+    return () => { active = false; };
+  }, [session]);
+
+  useEffect(() => {
+    const onChange = (next: AppStateStatus) => {
+      if (next === 'background' || next === 'inactive') {
+        backgroundedAt.current ??= Date.now();
+        return;
+      }
+      if (next === 'active') {
+        const resumedAt = Date.now();
+        const previousBackgroundedAt = backgroundedAt.current;
+        backgroundedAt.current = null;
+        if (session && shouldRelockAfterBackground(previousBackgroundedAt, resumedAt, biometricRequired || biometricEnabled)) setLocked(true);
+      }
+    };
+    const subscription = AppState.addEventListener('change', onChange);
+    return () => subscription.remove();
+  }, [biometricEnabled, biometricRequired, session]);
+
   const signIn = useCallback(async (email: string, password: string) => save(await loginUser(email.trim(), password)), [save]);
   const signUp = useCallback(async (input: { email: string; password: string; name: string }) => save(await registerUser({ ...input, email: input.email.trim() })), [save]);
   const signInWithApple = useCallback(async (input: { identityToken: string; givenName?: string; familyName?: string }) => save(await loginWithApple(input)), [save]);
@@ -60,13 +113,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await save(null);
   }, [save, session]);
   const setBiometricEnabled = useCallback((enabled: boolean) => {
+    if (biometricRequired && !enabled) return;
     setBiometricEnabledState(enabled);
     void writeBiometricEnabled(enabled);
-  }, []);
+  }, [biometricRequired]);
   const unlockWithBiometric = useCallback(async () => {
-    const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Unlock PolyClaw', fallbackLabel: 'Use password' }).catch(() => ({ success: false } as const));
+    const enrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
+    if (!enrolled) { setBiometricSupported(false); return false; }
+    const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Unlock PolyClaw', disableDeviceFallback: true, cancelLabel: 'Use account login' }).catch(() => ({ success: false } as const));
     return result.success;
   }, []);
+  const markUnlocked = useCallback(() => { setLocked(false); setRecoveryMode(false); }, []);
+  const beginRecoveryReauthentication = useCallback(async () => {
+    recoveryPending.current = true;
+    if (session) await logoutUser(session).catch(() => undefined);
+    await save(null);
+  }, [save, session]);
 
   const freshSession = useCallback(async () => {
     if (!session) throw Object.assign(new Error('Sign in required'), { status: 401 });
@@ -77,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [save, session]);
 
   const consumer = useCallback(async <T,>(procedure: ConsumerProcedure, input?: Record<string, unknown>) => {
+    if (recoveryMode && recoveryBlocksProcedure(procedure)) throw new Error('Re-enroll and complete biometric authentication before this security-sensitive action.');
     const active = await freshSession();
     try { return await consumerRequest<T>(active.accessToken, procedure, input); }
     catch (error) {
@@ -85,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await save(next);
       return consumerRequest<T>(next.accessToken, procedure, input);
     }
-  }, [freshSession, save]);
+  }, [freshSession, recoveryMode, save]);
 
   const request = useCallback(async <T,>(path: string, init?: { method?: 'POST'; body?: Record<string, unknown>; idempotencyKey?: string }) => {
     const active = await freshSession();
@@ -104,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [freshSession, save]);
 
-  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, setBiometricEnabled, unlockWithBiometric, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer }), [state, session, biometricSupported, biometricEnabled, setBiometricEnabled, unlockWithBiometric, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer]);
+  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer }), [state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

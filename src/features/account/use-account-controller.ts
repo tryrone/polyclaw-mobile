@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking } from 'react-native';
+import { randomUUID } from 'expo-crypto';
 import { useAuth } from '@/auth/provider';
 import {
   getPolyClawSubscription,
@@ -10,8 +10,9 @@ import {
 } from '@/billing/revenuecat';
 import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { ConsumerAccount } from '@/lib/types';
+import type { ConsumerAccount, DepositSetup, OwnerActionPreparation } from '@/lib/types';
 import { usePolyClawTheme } from '@/theme';
+import { usePolyClawWallet } from '@/wallet/privy-provider';
 import type { AccountMessage, AccountSectionKey, BusyOperation, RiskAcknowledgements } from './types';
 import {
   buildApprovalChecklist,
@@ -28,8 +29,11 @@ const initialRiskAcknowledgements: RiskAcknowledgements = {
 
 export function useAccountController() {
   const { preference, setPreference } = usePolyClawTheme();
-  const { session, signOut, consumer, biometricSupported, unlockWithBiometric } = useAuth();
+  const { session, signOut, consumer, biometricSupported, biometricRequired, recoveryMode, unlockWithBiometric } = useAuth();
+  const ownerWallet = usePolyClawWallet();
   const account = useConsumerResource<ConsumerAccount>('account', undefined, 45_000);
+  const depositWalletAddress = account.data?.depositWalletAddress;
+  const refreshAccount = account.refresh;
   const dashboard = useConsumerDashboard(60_000);
   const [expanded, setExpanded] = useState<AccountSectionKey | null>(null);
   const [price, setPrice] = useState('$9.99');
@@ -39,13 +43,14 @@ export function useAccountController() {
   const [address, setAddress] = useState('');
   const [signature, setSignature] = useState('');
   const [challenge, setChallenge] = useState<string | null>(null);
+  const [depositSetup, setDepositSetup] = useState<DepositSetup | null>(null);
   const [dangerArmed, setDangerArmed] = useState(false);
   const [riskAcknowledgements, setRiskAcknowledgements] = useState(initialRiskAcknowledgements);
   const operationInFlight = useRef(false);
   const userId = session?.user.id;
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || account.data?.access.mode === 'PILOT' || !account.data?.access.mode) return;
     let cleanup: (() => boolean) | undefined;
     void getPolyClawSubscription(userId)
       .then((state) => {
@@ -61,9 +66,22 @@ export function useAccountController() {
     return () => {
       cleanup?.();
     };
-  }, [userId]);
+  }, [account.data?.access.mode, userId]);
 
+  useEffect(() => {
+    if (!depositWalletAddress || !session) return;
+    const poll = () => consumer('depositStatus').then(() => refreshAccount()).catch(() => undefined);
+    const timer = setInterval(() => void poll(), 15_000);
+    void poll();
+    return () => clearInterval(timer);
+  }, [depositWalletAddress, session, consumer, refreshAccount]);
+
+  const readOnly = Boolean(account.error || dashboard.error);
   const run = async (name: BusyOperation, operation: () => Promise<unknown>, success: string) => {
+    if (readOnly) {
+      setMessage({ text: 'Controls are read-only until the latest server state can be verified.', tone: 'warning' });
+      return;
+    }
     if (operationInFlight.current) return;
     operationInFlight.current = true;
     setBusy(name);
@@ -83,8 +101,17 @@ export function useAccountController() {
     }
   };
 
-  const protectedRun = async (operation: () => Promise<void>) => {
-    if (biometricSupported && !(await unlockWithBiometric())) {
+  const protectedRun = async (operation: () => Promise<void>, allowRecovery = false) => {
+    if (recoveryMode) {
+      if (allowRecovery) await operation();
+      else setMessage({ text: 'Re-enroll biometrics before changing live-bot or pilot authorization.', tone: 'warning' });
+      return;
+    }
+    if (!biometricSupported) {
+      setMessage({ text: 'Face ID or Touch ID must be enrolled before changing live-bot authorization.', tone: 'warning' });
+      return;
+    }
+    if (!(await unlockWithBiometric())) {
       setMessage({ text: 'Authorization cancelled.', tone: 'warning' });
       return;
     }
@@ -100,7 +127,7 @@ export function useAccountController() {
 
   const checklist = useMemo(() => buildApprovalChecklist(account.data?.approval), [account.data?.approval]);
   const readiness = checklist.filter((item) => item.passed).length;
-  const riskQuizRequired = Boolean(account.data?.approval.manualReasons.includes('risk_quiz_required'));
+  const riskQuizRequired = Boolean(account.data?.approval.botReasons.includes('risk_quiz_required'));
 
   const toggleSection = (section: AccountSectionKey) => {
     setExpanded((current) => (current === section ? null : section));
@@ -129,11 +156,13 @@ export function useAccountController() {
     ui: {
       busy,
       isBusy: busy !== null,
+      readOnly,
       expanded,
       message,
       toggleSection,
     },
     subscription: {
+      visible: Boolean(account.data && account.data.access.mode !== 'PILOT'),
       active: Boolean(dashboard.data?.entitlement?.active || storeActive),
       price,
       purchase: () => run('purchase', () => billing('purchase'), 'Subscription confirmed. Server access will refresh shortly.'),
@@ -166,11 +195,26 @@ export function useAccountController() {
         run(
           'deposit',
           async () => {
-            const result = await consumer<{ url: string }>('beginDepositWallet');
-            await Linking.openURL(result.url);
+            const owner = await ownerWallet.ensureOwnerWallet();
+            const wallet = await consumer<{ approvalsConfirmed?: boolean }>('provisionDepositWallet', { ...owner, platform: 'IOS' });
+            if (wallet.approvalsConfirmed) setDepositSetup(await consumer<DepositSetup>('createDepositAddress'));
           },
-          'Opened Polymarket wallet onboarding.',
+          'Wallet setup refreshed. Approve trading contracts before requesting deposit routes.',
         ),
+      approveTrading: () => protectedRun(() => run('approve-wallet', async () => {
+        const prepared = await consumer<OwnerActionPreparation>('prepareOwnerAction', { kind: 'APPROVALS', reason: 'Authorize PolyClaw trading contracts', idempotencyKey: randomUUID() });
+        const ownerSignature = await ownerWallet.signTypedData(prepared.typedData);
+        await consumer('submitOwnerAction', { actionId: prepared.id, ownerSignature });
+      }, 'Owner-signed trading approvals submitted for reconciliation.')),
+      configured: ownerWallet.configured,
+      ownerAddress: ownerWallet.ownerAddress,
+      depositSetup,
+      withdrawTestDollar: () => protectedRun(() => run('withdrawal', async () => {
+        if (!ownerWallet.ownerAddress) throw new Error('Create the embedded owner wallet first.');
+        const prepared = await consumer<OwnerActionPreparation>('prepareOwnerAction', { kind: 'WITHDRAWAL', amountPusd: 1, destinationAddress: ownerWallet.ownerAddress, reason: 'Internal pilot withdrawal test', idempotencyKey: randomUUID() });
+        const ownerSignature = await ownerWallet.signTypedData(prepared.typedData);
+        await consumer('submitOwnerAction', { actionId: prepared.id, ownerSignature });
+      }, '$1 owner-signed withdrawal submitted for reconciliation.'), true),
     },
     approval: {
       checklist,
@@ -183,8 +227,29 @@ export function useAccountController() {
     },
     signer: {
       account: account.data,
-      renew: () => protectedRun(() => run('renew', () => consumer('renewSigner'), 'Signer authorization request started.')),
+      renew: () => protectedRun(() => run('renew', async () => {
+        const prepared = await consumer<{ authorizationPayload: string }>('renewSigner');
+        const ownerSignature = await ownerWallet.signMessage(prepared.authorizationPayload);
+        await consumer('authorizeBotSigner', { authorizationPayload: prepared.authorizationPayload, ownerSignature, platform: 'IOS' });
+      }, 'Bot signer authorized for 30 days. It cannot withdraw funds.')),
       revoke: () => protectedRun(() => run('revoke', () => consumer('revokeSigner'), 'Signer revocation started.')),
+      enable: () => protectedRun(() => run('enable', async () => {
+        await consumer('prepareCancellationPreflight', { idempotencyKey: randomUUID() });
+        let preflightStatus = 'PLACED';
+        const reconciliationDeadline = Date.now() + 15_000;
+        while (Date.now() < reconciliationDeadline) {
+          const preflight = await consumer<{ status?: string } | null>('cancellationPreflightStatus');
+          preflightStatus = preflight?.status ?? 'MISSING';
+          if (preflightStatus === 'CANCELLED') break;
+          if (preflightStatus === 'FAILED') throw new Error('The cancellation preflight failed and live activation remains blocked.');
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+        }
+        if (preflightStatus !== 'CANCELLED') throw new Error('Cancellation confirmation is still pending. Retry live activation after the venue reconciles it.');
+        const prepared = await consumer<{ activationPayload: string }>('prepareLiveActivation', { platform: 'IOS' });
+        const ownerSignature = await ownerWallet.signMessage(prepared.activationPayload);
+        await consumer('enableLiveBot', { platform: 'IOS', activationPayload: prepared.activationPayload, ownerSignature });
+      }, 'Live bot enabled.')),
+      disable: () => run('disable', () => consumer('disableLiveBot'), 'New live bot entries paused.'),
     },
     notifications: {
       values: account.data?.notifications,
@@ -202,7 +267,7 @@ export function useAccountController() {
       armDeletion: () => setDangerArmed(true),
       disconnectWallet: () =>
         protectedRun(() =>
-          run('disconnect', () => consumer('disconnectWallet'), 'Polymarket disconnect and signer revocation started.'),
+          run('disconnect', () => consumer('disconnectWallet'), 'Read-only Polymarket history disconnected. Your bot wallet is unchanged.'),
         ),
       requestOffboarding: () =>
         protectedRun(() =>
@@ -214,6 +279,7 @@ export function useAccountController() {
         ),
       signOut,
     },
+    security: { biometricRequired, biometricSupported, recoveryMode },
   };
 }
 

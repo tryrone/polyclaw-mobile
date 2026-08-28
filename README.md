@@ -1,6 +1,8 @@
 # PolyClaw Mobile
 
-Standalone Expo SDK 57 operator application for monitoring PolyClaw paper and live trading. This is intentionally separate from betclaw-mobile.
+Standalone Expo SDK 57 application for PolyClaw consumers and authorized operators. This is intentionally separate from betclaw-mobile.
+
+Consumer users can manage paper automation, subscriptions, their user-controlled Privy/Polymarket wallet, funding, and explicitly authorized live-bot access. ADMIN users additionally receive the operator monitoring and human-review surfaces below. Trading authority, secrets, idempotency, limits, and audit records remain server-side for both roles.
 
 ## Operator capabilities
 
@@ -22,7 +24,7 @@ The app becomes read-only whenever the backend snapshot is stale or unavailable.
 
 EXPO_PUBLIC_API_URL points to the BetClaw web application, not directly to PolyClaw. On a physical device it must be a reachable HTTPS address. EXPO_PUBLIC_EXPO_PROJECT_ID enables Expo push-token registration.
 
-Only BetClaw users with the ADMIN role can sign in. The web backend must configure:
+BetClaw users with the USER role receive consumer routes; users with the ADMIN role also receive operator routes. The web backend must configure:
 
     POLYCLAW_CONTROL_API_URL=http://127.0.0.1:4310/v1
     POLYCLAW_CONTROL_API_TOKEN=<shared-private-token>

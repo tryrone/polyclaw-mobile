@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Linking, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowSquareOut, SoccerBall } from 'phosphor-react-native';
+import { SoccerBall, Wallet } from 'phosphor-react-native';
 import { useAuth } from '@/auth/provider';
 import { PerformanceChart } from '@/components/performance-chart';
 import { ActionButton, Card, Header, Metric, money, percent, ResourceState, Screen, SectionHeading, shortDate, StatusPill } from '@/components/ui-kit';
@@ -25,6 +25,7 @@ export default function ConsumerPortfolioScreen() {
   const [manualBudget, setManualBudget] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [closingPositionId, setClosingPositionId] = useState<string | null>(null);
 
   const saveBudgets = async () => {
     setSaving(true); setMessage(null);
@@ -34,6 +35,13 @@ export default function ConsumerPortfolioScreen() {
       await resource.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save budgets'); }
     finally { setSaving(false); }
+  };
+  const closePosition = async (positionId: string) => {
+    if (resource.error || account.error) return;
+    setClosingPositionId(positionId); setMessage(null);
+    try { await consumer('prepareClosePosition', { positionId }); setMessage('Risk-reducing SELL submitted. New entries remain paused while it reconciles.'); await Promise.all([resource.refresh(), account.refresh()]); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not submit the risk-reducing close'); }
+    finally { setClosingPositionId(null); }
   };
   const point = selected == null ? resource.data?.series.at(-1) : resource.data?.series[selected];
   return <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
@@ -47,7 +55,8 @@ export default function ConsumerPortfolioScreen() {
       <SectionHeading title="Trading budgets" meta={`${money(resource.data.budgets.unallocatedUsdc)} UNALLOCATED`} />
       <Card><Text style={[styles.copy, { color: theme.textMuted }]}>{features.manualFootballTrading ? 'Bot and manual limits are separate allocations over one reconciled account. Server limits still cap each order and combined daily exposure.' : 'Set the maximum amount the bot may use. Unallocated funds remain outside automated trading.'}</Text><View style={styles.inputs}><BudgetInput label="Bot USDC" value={botBudget ?? String(resource.data.budgets.botBudgetUsdc)} onChangeText={setBotBudget} />{features.manualFootballTrading ? <BudgetInput label="Manual USDC" value={manualBudget ?? String(resource.data.budgets.manualBudgetUsdc)} onChangeText={setManualBudget} /> : null}</View><ActionButton label="Save budget" loading={saving} onPress={() => void saveBudgets()} />{message ? <Text style={[styles.inspect, { color: theme.textMuted }]}>{message}</Text> : null}</Card>
       {features.manualFootballTrading && Platform.OS !== 'web' ? <ActionButton label="Trade a football match" icon={SoccerBall as never} onPress={() => router.push('/football-trade')} /> : null}
-      <View style={styles.actions}>{account.data?.funding.depositUrl ? <ActionButton label="Deposit on Polymarket" icon={ArrowSquareOut as never} variant="secondary" onPress={() => void Linking.openURL(account.data!.funding.depositUrl!)} /> : null}{account.data?.funding.withdrawalUrl ? <ActionButton label="Withdraw on Polymarket" icon={ArrowSquareOut as never} variant="secondary" onPress={() => void Linking.openURL(account.data!.funding.withdrawalUrl!)} /> : null}</View>
+      {resource.data.livePositions.length ? <><SectionHeading title="Live bot positions" meta={`${resource.data.livePositions.length}`} />{resource.data.livePositions.map((position) => <Card key={position.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{position.fixtureLabel}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{position.marketLabel} · {position.selectionLabel}</Text></View><StatusPill label={position.status} tone="warning" /></View><Text style={[styles.inspect, { color: theme.textMuted }]}>{Number(position.positionShares).toFixed(4)} shares · {money(Number(position.currentValueUsdc))} current value</Text><ActionButton label="Close risk now" variant="danger" loading={closingPositionId === position.id} disabled={Boolean(resource.error || account.error) || (closingPositionId !== null && closingPositionId !== position.id)} onPress={() => void closePosition(position.id)} /></Card>)}</> : null}
+      {account.data ? <Card><Text style={[styles.heading, { color: theme.text }]}>Live wallet balance: {money(account.data.availablePusd)}</Text><Text style={[styles.copy, { color: theme.textMuted, marginTop: 6 }]}>Deposit routes are generated natively from supported Bridge assets. New live entries pause below {money(account.data.funding.minimumEntryPusd)}; full readiness requires {money(account.data.funding.minimumReadyPusd)}.</Text><View style={{ marginTop: spacing.md }}><ActionButton label="Manage bot wallet" icon={Wallet as never} variant="secondary" onPress={() => router.push('/account')} /></View></Card> : null}
       {features.manualFootballTrading ? <><SectionHeading title="Manual orders" meta={`${resource.data.manualOrders.length}`} />{resource.data.manualOrders.length ? resource.data.manualOrders.slice().reverse().map((order) => <Card key={order.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{order.fixtureLabel}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{order.marketLabel} · {order.selectionLabel}</Text></View><StatusPill label={order.status} tone={order.status.includes('REJECT') || order.status === 'EXPIRED' ? 'danger' : 'neutral'} /></View><Text style={[styles.inspect, { color: theme.textMuted }]}>{money(order.approvedStakeUsdc)} at {(order.limitPrice * 100).toFixed(1)}¢ · max loss {money(order.maximumLossUsdc)}</Text></Card>) : <Card><Text style={[styles.copy, { color: theme.textMuted }]}>No manual football orders yet.</Text></Card>}</> : null}
       {resource.data.polymarketPositions.length ? <><SectionHeading title="Linked Polymarket positions" meta="READ ONLY" />{resource.data.polymarketPositions.map((position) => <Card key={`${position.conditionId}-${position.asset}`}><View style={styles.between}><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{position.title ?? 'Polymarket position'}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{position.outcome ?? 'Selection'} · {Number(position.size ?? 0).toFixed(3)} shares</Text></View><Text style={[styles.tableValue, { color: theme.text }]}>{money(position.currentValue)}</Text></View><Text style={[styles.inspect, { color: (position.cashPnl ?? 0) >= 0 ? theme.success : theme.danger }]}>Cash P&L {money(position.cashPnl)} · avg {(Number(position.avgPrice ?? 0) * 100).toFixed(1)}¢</Text></Card>)}</> : null}
     </> : null}
