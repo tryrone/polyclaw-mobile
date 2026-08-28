@@ -126,10 +126,7 @@ export function SectionHeading({ title, meta }: { title: string; meta?: string }
 }
 
 export { Staggered };
-
-export function money(value: number | null | undefined) { return `$${(value ?? 0).toFixed(2)}`; }
-export function percent(value: number | null | undefined) { return `${((value ?? 0) * 100).toFixed(1)}%`; }
-export function shortDate(value: string | null | undefined) { return value ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+export { money, percent, shortDate } from '@/lib/format';
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },

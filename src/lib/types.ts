@@ -64,7 +64,7 @@ export type ConsumerFootballMarket = {
 };
 export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
 export type ConsumerAccount = {
-  mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number;
+  mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
   notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
   approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
