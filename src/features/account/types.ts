@@ -5,6 +5,7 @@ export type AccountSectionKey =
   | 'signer'
   | 'notifications'
   | 'appearance'
+  | 'guide'
   | 'safety'
   | 'controls';
 
@@ -38,6 +39,8 @@ export type RiskAcknowledgements = {
 };
 
 export type ApprovalChecklistItem = {
+  id: string;
   label: string;
+  detail: string;
   passed: boolean;
 };

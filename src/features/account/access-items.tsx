@@ -32,9 +32,12 @@ export function ApprovalItem({ controller }: { controller: AccountController }) 
       </View>
       <View style={styles.checklist}>
         {approval.checklist.map((item) => (
-          <View key={item.label} style={styles.checkRow}>
+          <View key={item.id} style={styles.checkRow}>
             {item.passed ? <CheckCircle size={20} color={theme.success} weight="fill" /> : <View style={[styles.pendingDot, { borderColor: theme.borderStrong }]} />}
-            <Text style={[styles.checkText, { color: item.passed ? theme.text : theme.textMuted }]}>{item.label}</Text>
+            <View style={styles.flex}>
+              <Text style={[styles.checkText, { color: item.passed ? theme.text : theme.textMuted }]}>{item.label}</Text>
+              <Text style={[styles.itemDetail, { color: theme.textMuted }]}>{item.detail}</Text>
+            </View>
           </View>
         ))}
       </View>
@@ -59,10 +62,10 @@ export function ApprovalItem({ controller }: { controller: AccountController }) 
         </View>
       ) : null}
       <ActionButton
-        label="Submit for live review"
+        label={approval.status === 'PENDING_REVIEW' ? 'Review pending' : approval.status === 'APPROVED' ? 'Wallet evidence approved' : approval.reviewReady ? 'Submit for live review' : 'Complete required steps first'}
         variant="secondary"
         loading={ui.busy === 'review'}
-        disabled={ui.readOnly || (approval.riskQuizRequired && !approval.allRiskAcknowledged) || (ui.isBusy && ui.busy !== 'review')}
+        disabled={ui.readOnly || !approval.reviewReady || approval.status === 'PENDING_REVIEW' || approval.status === 'APPROVED' || (approval.riskQuizRequired && !approval.allRiskAcknowledged) || (ui.isBusy && ui.busy !== 'review')}
         onPress={() => void approval.submitReview()}
       />
       <Text style={[styles.footnote, { color: theme.textMuted }]}>During the internal pilot, an active grant and exact operator approval replace subscription access.</Text>

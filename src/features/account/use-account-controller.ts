@@ -125,7 +125,7 @@ export function useAccountController() {
     return openSubscriptionManagement(session.user.id);
   };
 
-  const checklist = useMemo(() => buildApprovalChecklist(account.data?.approval), [account.data?.approval]);
+  const checklist = useMemo(() => buildApprovalChecklist(account.data ?? undefined), [account.data]);
   const readiness = checklist.filter((item) => item.passed).length;
   const riskQuizRequired = Boolean(account.data?.approval.botReasons.includes('risk_quiz_required'));
 
@@ -150,6 +150,7 @@ export function useAccountController() {
   return {
     resource: account,
     profile: {
+      id: session?.user.id,
       name: session?.user.name,
       email: session?.user.email,
     },
@@ -219,6 +220,8 @@ export function useAccountController() {
     approval: {
       checklist,
       readiness,
+      reviewReady: Boolean(account.data?.approval.reviewReady),
+      status: account.data?.approvalStatus,
       riskAcknowledgements,
       riskQuizRequired,
       allRiskAcknowledged: Object.values(riskAcknowledgements).every(Boolean),

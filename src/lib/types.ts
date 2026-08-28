@@ -37,8 +37,10 @@ export type ConsumerDashboard = {
   summary: { dailyExposureUsdc: number; openExposureUsdc: number; openPositions: number; availableBalanceUsdc: number; realizedPnlUsdc: number; equityUsdc: number; drawdownFraction: number };
   riskLimits: { stakeBankrollFraction: number; dailyExposureBankrollFraction: number; maximumDrawdownFraction: number };
   release: { activationRequiresInvite: boolean };
-  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string } | null };
+  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string } | null; pilotRequest?: PilotAccessRequest | null };
 };
+
+export type PilotAccessRequest = { id: string; status: 'PENDING' | 'FULFILLED' | 'CLOSED'; requestedAt: string };
 
 export type ConsumerMode = 'PAPER' | 'LIVE_LOCKED' | 'LIVE';
 export type ConsumerPortfolioPoint = { at: string; equityUsdc: number; tradingPnlUsdc: number; returnFraction: number; drawdownFraction: number; source: 'BOT' | 'MANUAL' | 'COMBINED' };
@@ -67,9 +69,9 @@ export type ConsumerAccount = {
   mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
   notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
-  approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
+  approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; reviewReady: boolean; reviewMissingReasons: string[]; ownerWithdrawalComplete: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
   funding: { minimumReadyPusd: number; minimumEntryPusd: number };
-  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string; walletCapPusd: number; canaryAttemptsUsed: number; canaryAttemptLimit: number } | null };
+  access: { mode: 'PILOT' | 'HYBRID' | 'SUBSCRIPTION'; active: boolean; source: 'PILOT' | 'SUBSCRIPTION' | null; pilotGrant?: { status: string; startsAt: string; expiresAt: string; walletCapPusd: number; canaryAttemptsUsed: number; canaryAttemptLimit: number } | null; pilotRequest?: PilotAccessRequest | null };
 };
 
 export type OwnerActionPreparation = {
