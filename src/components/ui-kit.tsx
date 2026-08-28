@@ -1,16 +1,18 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { LucideIcon } from '@/components/modern-icons';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
 import type { ReactElement } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { fonts, radius, spacing, usePolyClawTheme, type Theme } from '@/theme';
+import { fonts, layout, radius, spacing, usePolyClawTheme, type Theme } from '@/theme';
 import { haptics, PulsingDot, PressableScale, Skeleton, Staggered, Ticker } from './motion';
 
 const glassAvailable = isGlassEffectAPIAvailable();
 
 export function Screen({ children, refreshControl }: { children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps> }) {
   const { theme } = usePolyClawTheme();
-  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView contentContainerStyle={styles.screen} refreshControl={refreshControl}>{children}</ScrollView></SafeAreaView>;
+  const { width } = useWindowDimensions();
+  const gutter = width >= layout.largeScreenBreakpoint ? layout.largeScreenGutter : layout.phoneGutter;
+  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView contentContainerStyle={[styles.screen, { paddingHorizontal: gutter }]} refreshControl={refreshControl}>{children}</ScrollView></SafeAreaView>;
 }
 
 export function Header({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
@@ -131,7 +133,7 @@ export function shortDate(value: string | null | undefined) { return value ? new
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  screen: { padding: spacing.lg, paddingBottom: 130, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  screen: { paddingVertical: spacing.lg, paddingBottom: 130, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
   header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12 },
   eyebrow: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.8, marginBottom: 5 },
   title: { fontFamily: fonts.displayExtraBold, fontSize: 30, letterSpacing: -1.2 },
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
   metricLabel: { fontFamily: fonts.medium, fontSize: 12 },
   metricValue: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.8 },
   detail: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
-  button: { minHeight: 50, borderRadius: radius.sm, paddingHorizontal: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  button: { minHeight: 50, borderRadius: layout.controlRadius, paddingHorizontal: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   buttonText: { fontFamily: fonts.bold, fontSize: 14 },
   disabled: { opacity: 0.45 },
   empty: { alignItems: 'center', paddingVertical: 32, gap: 6 },

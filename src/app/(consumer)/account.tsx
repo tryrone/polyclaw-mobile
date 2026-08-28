@@ -29,7 +29,7 @@ export default function ConsumerAccountScreen() {
       <AccountMessageBanner message={controller.ui.message} />
 
       <SettingsGroup title="Membership & trading">
-        <SubscriptionItem controller={controller} />
+        {controller.subscription.visible ? <SubscriptionItem controller={controller} /> : null}
         <WalletItem controller={controller} />
         <ApprovalItem controller={controller} />
         <SignerItem controller={controller} />

@@ -99,6 +99,7 @@ export function usePolyClawTheme() {
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { sm: 10, md: 16, lg: 24, pill: 999 } as const;
+export const layout = { phoneGutter: 8, largeScreenGutter: 16, onboardingGutter: 16, controlRadius: 16, largeScreenBreakpoint: 768 } as const;
 export const fonts = {
   display: 'Manrope_700Bold',
   displayExtraBold: 'Manrope_800ExtraBold',

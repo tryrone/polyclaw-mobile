@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import '@/polyfills';
+import { useEffect } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
@@ -9,16 +10,16 @@ import { PolyClawThemeProvider, usePolyClawTheme } from '@/theme';
 import { NotificationBootstrap } from '@/notifications/bootstrap';
 import { UnlockView } from '@/components/unlock-view';
 import { features } from '@/lib/features';
+import { PolyClawWalletProvider } from '@/wallet/privy-provider';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 
 function AuthenticatedStack() {
-  const { state, session, biometricEnabled } = useAuth();
+  const { state, session, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, markUnlocked } = useAuth();
   const { theme } = usePolyClawTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const [unlockedToken, setUnlockedToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (state === 'hydrating') return;
@@ -31,11 +32,12 @@ function AuthenticatedStack() {
     if (state === 'authenticated' && session?.user.role === 'ADMIN' && inConsumer) router.replace('/');
   }, [pathname, router, session?.user.role, state]);
 
-  const needsUnlock = state === 'authenticated' && biometricEnabled && !!session && unlockedToken !== session.accessToken;
+  if (state === 'authenticated' && !securityResolved) return null;
+  const needsUnlock = state === 'authenticated' && !recoveryMode && (biometricRequired || biometricEnabled) && locked;
   return (
     <>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      {needsUnlock ? <UnlockView onSuccess={() => setUnlockedToken(session ? session.accessToken : 'unlocked')} /> : <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background }, animation: 'slide_from_right', animationDuration: 260 }} />}
+      {needsUnlock ? <UnlockView onSuccess={markUnlocked} /> : <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background }, animation: 'slide_from_right', animationDuration: 260 }} />}
     </>
   );
 }
@@ -44,5 +46,5 @@ export default function RootLayout() {
   const [loaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Manrope_700Bold, Manrope_800ExtraBold });
   useEffect(() => { if (loaded) SplashScreen.hide(); }, [loaded]);
   if (!loaded) return null;
-  return <PolyClawThemeProvider><AuthProvider><NotificationBootstrap /><AuthenticatedStack /></AuthProvider></PolyClawThemeProvider>;
+  return <PolyClawThemeProvider><AuthProvider><PolyClawWalletProvider><NotificationBootstrap /><AuthenticatedStack /></PolyClawWalletProvider></AuthProvider></PolyClawThemeProvider>;
 }

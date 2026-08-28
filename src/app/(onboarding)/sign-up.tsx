@@ -1,20 +1,142 @@
-import { router } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleLogo } from 'phosphor-react-native';
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+
 import { useAuth } from '@/auth/provider';
-import { PressableScale } from '@/components/motion';
-import { ActionButton } from '@/components/ui-kit';
-import { fonts, radius, spacing, usePolyClawTheme } from '@/theme';
+import {
+  AuthBrand,
+  AuthDivider,
+  AuthField,
+  AuthFootnote,
+  AuthIntro,
+  AuthPrimaryButton,
+  AuthScaffold,
+  AuthSwitchLink,
+  OAuthButtons,
+} from '@/components/auth-onboarding';
+import { fonts, spacing, usePolyClawTheme } from '@/theme';
 
 export default function SignUpScreen() {
-  const { theme } = usePolyClawTheme(); const { signUp, signInWithApple, signInWithGoogle } = useAuth();
-  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  const submit = async () => { setBusy(true); setError(null); try { await signUp({ name, email, password }); router.replace('/home'); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not create account'); } finally { setBusy(false); } };
-  const apple = async () => { setBusy(true); setError(null); try { const credential = await AppleAuthentication.signInAsync({ requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL] }); if (!credential.identityToken) throw new Error('Apple did not return an identity token.'); await signInWithApple({ identityToken: credential.identityToken, givenName: credential.fullName?.givenName ?? undefined, familyName: credential.fullName?.familyName ?? undefined }); router.replace('/home'); } catch (caught) { if ((caught as { code?: string }).code !== 'ERR_REQUEST_CANCELED') setError(caught instanceof Error ? caught.message : 'Apple sign up failed'); } finally { setBusy(false); } };
-  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.screen, { backgroundColor: theme.background }]}><View style={styles.content}><Text style={[styles.kicker, { color: theme.accent }]}>CREATE YOUR ACCOUNT</Text><Text style={[styles.title, { color: theme.text }]}>Meet your paper-trading bot</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Start with a fixed $1,000 simulation. No deposit or Polymarket wallet is needed.</Text><View style={styles.form}><Field label="NAME" value={name} onChangeText={setName} placeholder="Your name" /><Field label="EMAIL" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" /><Field label="PASSWORD" value={password} onChangeText={setPassword} placeholder="At least 8 characters" secureTextEntry />{error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}<ActionButton label="Create account" loading={busy} disabled={busy || name.trim().length < 2 || !email || password.length < 8} onPress={() => void submit()} /><ActionButton label="Continue with Google" icon={GoogleLogo as never} variant="secondary" loading={busy} onPress={async () => { setBusy(true); setError(null); try { await signInWithGoogle(); router.replace('/home'); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Google sign up failed'); } finally { setBusy(false); } }} />{Platform.OS === 'ios' ? <AppleAuthentication.AppleAuthenticationButton accessibilityLabel="Sign up with Apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP} buttonStyle={theme.mode === 'dark' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={10} style={styles.apple} onPress={() => void apple()} /> : null}<PressableScale accessibilityRole="button" accessibilityLabel="Sign in" onPress={() => router.replace('/(onboarding)/sign-in' as never)} style={styles.link}><Text style={[styles.linkText, { color: theme.accent }]}>Already have an account? Sign in</Text></PressableScale></View></View></KeyboardAvoidingView>;
+  const { theme } = usePolyClawTheme();
+  const { signUp, signInWithApple, signInWithGoogle } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signUp({ name, email, password });
+      router.replace('/home');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not create account');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const google = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+      router.replace('/home');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Google sign up failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apple = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('Apple did not return an identity token.');
+      await signInWithApple({
+        identityToken: credential.identityToken,
+        givenName: credential.fullName?.givenName ?? undefined,
+        familyName: credential.fullName?.familyName ?? undefined,
+      });
+      router.replace('/home');
+    } catch (caught) {
+      if ((caught as { code?: string }).code !== 'ERR_REQUEST_CANCELED') {
+        setError(caught instanceof Error ? caught.message : 'Apple sign up failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthScaffold>
+      <AuthBrand />
+      <AuthIntro
+        copy="Create your profile, complete wallet setup, and set your limits before PolyClaw places real-money trades for you."
+        eyebrow="AUTOMATED POLYMARKET TRADING"
+        title="Put your bot to work"
+      />
+      <OAuthButtons action="sign-up" busy={busy} onApple={() => void apple()} onGoogle={() => void google()} />
+      <AuthDivider label="OR" />
+      <View style={styles.fields}>
+        <AuthField
+          autoComplete="name"
+          label="Name"
+          onChangeText={setName}
+          placeholder="Name"
+          textContentType="name"
+          value={name}
+        />
+        <AuthField
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          label="Email address"
+          onChangeText={setEmail}
+          placeholder="Email address"
+          textContentType="emailAddress"
+          value={email}
+        />
+        <AuthField
+          autoComplete="new-password"
+          label="Password"
+          onChangeText={setPassword}
+          placeholder="Password · 8+ characters"
+          secureTextEntry
+          textContentType="newPassword"
+          value={password}
+        />
+        {error ? <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
+        <AuthPrimaryButton
+          accessibilityLabel="Create account"
+          disabled={busy || name.trim().length < 2 || !email || password.length < 8}
+          label="Create account"
+          loading={busy}
+          onPress={() => void submit()}
+        />
+      </View>
+      <AuthSwitchLink
+        accessibilityLabel="Already have an account? Sign in"
+        action="Sign in"
+        onPress={() => router.replace('/(onboarding)/sign-in' as never)}
+        prefix="Already have an account?"
+      />
+      <AuthFootnote>Live trading requires a funded dedicated wallet, eligibility checks, and your approval. Trading can lose money.</AuthFootnote>
+    </AuthScaffold>
+  );
 }
 
-function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) { const { theme } = usePolyClawTheme(); const { label, ...input } = props; return <View><Text style={[styles.label, { color: theme.textMuted }]}>{label}</Text><TextInput {...input} placeholderTextColor={theme.textMuted} style={[styles.input, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} /></View>; }
-const styles = StyleSheet.create({ screen: { flex: 1, justifyContent: 'center' }, content: { alignSelf: 'center', gap: 10, maxWidth: 520, padding: 28, width: '100%' }, kicker: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 2 }, title: { fontFamily: fonts.displayExtraBold, fontSize: 32, letterSpacing: -1.3 }, copy: { fontFamily: fonts.regular, fontSize: 13.5, lineHeight: 20 }, form: { gap: spacing.lg, marginTop: spacing.md }, label: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1.2, marginBottom: 7 }, input: { borderRadius: radius.sm, borderWidth: 1, fontFamily: fonts.medium, fontSize: 15, minHeight: 52, paddingHorizontal: 14 }, error: { fontFamily: fonts.medium, fontSize: 12.5 }, apple: { height: 50, width: '100%' }, link: { alignItems: 'center', justifyContent: 'center', minHeight: 44 }, linkText: { fontFamily: fonts.semibold, fontSize: 13 } });
+const styles = StyleSheet.create({
+  fields: { gap: spacing.md },
+  error: { fontFamily: fonts.medium, fontSize: 12.5 },
+});

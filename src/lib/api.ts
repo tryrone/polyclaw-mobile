@@ -45,9 +45,9 @@ export async function logoutUser(session: AuthSession) {
   await client(session.accessToken).auth.mobileLogout.mutate({ accessToken: session.accessToken, refreshToken: session.refreshToken });
 }
 
-export type ConsumerProcedure = 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'portfolio' | 'footballMarkets' | 'quoteManualOrder' | 'submitManualOrder' | 'cancelManualOrder' | 'account' | 'createWalletChallenge' | 'verifyWalletOwnership' | 'beginDepositWallet' | 'updateBudgets' | 'submitLiveReview' | 'updateNotifications' | 'renewSigner' | 'revokeSigner' | 'disconnectWallet' | 'requestOffboarding';
+export type ConsumerProcedure = 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'portfolio' | 'footballMarkets' | 'quoteManualOrder' | 'submitManualOrder' | 'cancelManualOrder' | 'account' | 'walletIdentityToken' | 'provisionDepositWallet' | 'depositWalletStatus' | 'createDepositAddress' | 'depositStatus' | 'createWalletChallenge' | 'verifyWalletOwnership' | 'connectReadOnlyWallet' | 'beginDepositWallet' | 'updateBudgets' | 'submitLiveReview' | 'updateNotifications' | 'renewSigner' | 'authorizeBotSigner' | 'prepareLiveActivation' | 'enableLiveBot' | 'disableLiveBot' | 'revokeSigner' | 'revokeBotSigner' | 'prepareClosePosition' | 'closePositionStatus' | 'prepareOwnerAction' | 'submitOwnerAction' | 'ownerActionStatus' | 'prepareWithdrawal' | 'disconnectWallet' | 'requestOffboarding' | 'pilotGrantStatus' | 'grantPilotAccess' | 'revokePilotAccess' | 'liveReviewQueue' | 'approveLiveAccount' | 'denyLiveAccount' | 'revokeLiveAccount' | 'prepareCancellationPreflight' | 'cancellationPreflightStatus' | 'canaryIntentQueue' | 'releaseCanaryIntent' | 'resetCanaryAttempt';
 
-const consumerQueries = new Set<ConsumerProcedure>(['dashboard', 'portfolio', 'footballMarkets', 'account']);
+const consumerQueries = new Set<ConsumerProcedure>(['dashboard', 'portfolio', 'footballMarkets', 'account', 'depositWalletStatus', 'depositStatus', 'pilotGrantStatus', 'ownerActionStatus', 'closePositionStatus', 'liveReviewQueue', 'cancellationPreflightStatus', 'canaryIntentQueue']);
 
 export async function consumerRequest<T>(accessToken: string, procedure: ConsumerProcedure, input?: Record<string, unknown>): Promise<T> {
   const endpoint = client(accessToken).polyClawConsumer[procedure];
