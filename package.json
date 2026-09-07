@@ -38,6 +38,7 @@
     "expo-updates": "~57.0.19",
     "expo-web-browser": "~57.0.2",
     "fast-text-encoding": "^1.0.6",
+    "ox": "0.6.7",
     "permissionless": "^0.2.47",
     "phosphor-react-native": "^3.0.6",
     "react": "19.2.3",
