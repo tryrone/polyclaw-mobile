@@ -1,3 +1,4 @@
+import { marketLabel, decimalOdds, isDoubleChance } from '@/lib/markets';
 import { CheckCircle2, CircleX, Microscope } from '@/components/modern-icons';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -24,9 +25,13 @@ export default function QueueScreen() {
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
       <Header eyebrow="UPCOMING INTENTS" title="Trade queue" />
       <ResourceState loading={resource.loading} error={resource.error} stale={resource.stale} />
-      {resource.data?.ready.length
-        ? resource.data.ready.map((trade, index) => <Staggered key={trade.id} index={index}><TradeCard trade={trade} /></Staggered>)
-        : !resource.loading ? <EmptyState title="Queue is clear" detail="New trades appear only after research, pricing, and risk checks pass." /> : null}
+      {resource.data?.ready.length ? [
+        { title: 'Double Chance', items: resource.data.ready.filter((trade) => isDoubleChance(trade.market)) },
+        { title: 'Other markets', items: resource.data.ready.filter((trade) => !isDoubleChance(trade.market)) },
+      ].filter((group) => group.items.length).map((group) => <View key={group.title} style={{ gap: spacing.md }}>
+        <SectionHeading title={group.title} meta="PRE-MATCH" />
+        {group.items.map((trade, index) => <Staggered key={trade.id} index={index}><TradeCard trade={trade} /></Staggered>)}
+      </View>) : !resource.loading ? <EmptyState title="Queue is clear" detail="New trades appear only after research, pricing, and risk checks pass." /> : null}
 
       {resource.data?.noBet.length ? (
         <>
@@ -40,12 +45,13 @@ export default function QueueScreen() {
                 <Card accessible accessibilityLabel={`No bet decision for ${item.fixtureId ?? item.gammaId}, ${failed.length} failed checks`}>
                   <View style={styles.row}>
                     <View style={styles.flex}>
-                      <Text style={[styles.title, { color: theme.text }]}>Candidate rejected</Text>
+                      <Text style={[styles.title, { color: theme.text }]}>{item.market ? marketLabel(item.market) : 'Candidate rejected'}</Text>
                       <Text style={[styles.copy, { color: theme.textMuted }]}>{item.fixtureId ?? item.gammaId} · {item.session} · {shortDate(item.createdAt)}</Text>
                     </View>
                     <StatusPill label="NO BET" tone="neutral" />
                   </View>
 
+                  {isDoubleChance(item.market) ? <Text style={[styles.title, { color: theme.text }]}>Double Chance · {decimalOdds(item.tokenPrice)} odds{item.tokenPrice != null ? ` · ${(item.tokenPrice * 100).toFixed(1)}¢` : ''}</Text> : null}
                   <View style={styles.criteriaList}>
                     {(failed.length ? failed : allCriteria).slice(0, 5).map((criterion) => (
                       <View key={criterion.criterion} style={[styles.criterion, { backgroundColor: criterion.pass ? theme.successSoft : theme.dangerSoft }]}>

@@ -82,7 +82,7 @@ export function WalletItem({ controller }: { controller: AccountController }) {
       ) : (
         <>
           <Text style={[styles.body, { color: theme.textMuted }]}>
-            Optional: prove ownership to import an existing Polymarket account&apos;s read-only history. This never grants bot execution rights, and PolyClaw never asks for a private key.
+            Link an existing wallet to view its Polymarket history. You’ll sign a message to confirm ownership. Your private key stays with you.
           </Text>
           <TextInput
             accessibilityLabel="Polymarket wallet address"
@@ -136,15 +136,15 @@ export function WalletItem({ controller }: { controller: AccountController }) {
             <ShieldCheck size={17} color={theme.accent} />
           </View>
           <View style={styles.flex}>
-            <Text style={[styles.itemTitle, { color: theme.text }]}>Dedicated bot Deposit Wallet</Text>
-            <Text style={[styles.itemDetail, { color: theme.textMuted }]}>{wallet.account?.depositWalletAddress ? compactAddress(wallet.account.depositWalletAddress) : 'User-controlled and separate from history linking'}</Text>
+            <Text style={[styles.itemTitle, { color: theme.text }]}>Bot trading wallet</Text>
+            <Text style={[styles.itemDetail, { color: theme.textMuted }]}>{wallet.account?.depositWalletAddress ? compactAddress(wallet.account.depositWalletAddress) : 'For deposits and approved bot trades'}</Text>
           </View>
         </View>
         <Text style={[styles.body, { color: theme.textMuted }]}>
-          A passkey-backed Privy wallet owns this POLY_1271 wallet. The bot can place, cancel, and close approved positions, but only you can withdraw.
+          You control this wallet with your passkey. The bot can manage approved trades; only you can withdraw funds.
         </Text>
         <ActionButton
-          label={wallet.account?.depositWalletAddress ? 'Refresh deposit routes' : 'Create bot wallet'}
+          label={!wallet.configured ? 'Wallet setup unavailable' : wallet.account?.depositWalletAddress ? 'Refresh deposit routes' : 'Create bot wallet'}
           variant="secondary"
           disabled={ui.readOnly || !wallet.configured || (ui.isBusy && ui.busy !== 'deposit')}
           loading={ui.busy === 'deposit'}
@@ -152,7 +152,7 @@ export function WalletItem({ controller }: { controller: AccountController }) {
         />
         {wallet.account?.walletLifecycle === 'APPROVALS_PENDING' ? <ActionButton label="Approve trading contracts" disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'approve-wallet')} loading={ui.busy === 'approve-wallet'} onPress={() => void wallet.approveTrading()} /> : null}
         {wallet.account?.walletLifecycle === 'FUNDED' ? <ActionButton label="Run $1 withdrawal test" variant="secondary" disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'withdrawal')} loading={ui.busy === 'withdrawal'} onPress={() => void wallet.withdrawTestDollar()} /> : null}
-        {!wallet.configured ? <Text style={[styles.footnote, { color: theme.warning }]}>Wallet setup is disabled until this build has the dedicated Privy app ID and client ID.</Text> : null}
+        {!wallet.configured ? <Text style={[styles.footnote, { color: theme.warning }]}>Wallet setup is unavailable in this app version. You can continue reviewing your linked history.</Text> : null}
         {wallet.depositSetup ? (
           <View style={styles.actionStack}>
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>SUPPORTED ASSETS</Text>

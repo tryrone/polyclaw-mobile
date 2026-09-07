@@ -1,3 +1,4 @@
+import { marketLabel, decimalOdds, isDoubleChance } from '@/lib/markets';
 import { router } from 'expo-router';
 import { ArrowUpRight, Clock3 } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
@@ -21,12 +22,12 @@ export function TradeCard({ trade }: { trade: Trade }) {
           <ArrowUpRight size={18} color={theme.textMuted} />
         </View>
         <Text style={[styles.fixture, { color: theme.text }]} numberOfLines={2}>{trade.fixtureLabel}</Text>
-        <Text style={[styles.market, { color: theme.textMuted }]}>{trade.market} · {trade.side}</Text>
+        <Text style={[styles.market, { color: theme.textMuted }]}>{marketLabel(trade.market)}{isDoubleChance(trade.market) ? ' · 90 min + stoppage' : ` · ${trade.side}`}</Text>
         <View style={[styles.separator, { backgroundColor: theme.border }]} />
         <View style={styles.row}>
           <View><Text style={[styles.label, { color: theme.textMuted }]}>STAKE</Text><Text style={[styles.value, { color: theme.text }]}>{money(trade.plannedStake)}</Text></View>
           <View><Text style={[styles.label, { color: theme.textMuted }]}>EDGE</Text><Text style={[styles.value, { color: theme.success }]}>{percent(trade.edge)}</Text></View>
-          <View><Text style={[styles.label, { color: theme.textMuted }]}>ENTRY</Text><Text style={[styles.value, { color: theme.text }]}>{trade.entryPrice.toFixed(3)}</Text></View>
+          <View><Text style={[styles.label, { color: theme.textMuted }]}>{isDoubleChance(trade.market) ? 'ODDS' : 'ENTRY'}</Text><Text style={[styles.value, { color: theme.text }]}>{isDoubleChance(trade.market) ? decimalOdds(trade.entryPrice) : trade.entryPrice.toFixed(3)}</Text></View>
         </View>
         <View style={styles.time}><Clock3 size={13} color={theme.textMuted} /><Text style={[styles.timeText, { color: theme.textMuted }]}>{shortDate(trade.kickoff)}</Text></View>
       </Card>

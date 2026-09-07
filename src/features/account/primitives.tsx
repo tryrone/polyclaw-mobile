@@ -12,14 +12,16 @@ export function AccountProfile({ name, email, userId }: { name?: string | null; 
   const displayName = name || 'PolyClaw member';
   return (
     <View style={[styles.profileCard, { backgroundColor: theme.panelRaised, borderColor: theme.border }]}>
-      <View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}>
-        <Text style={[styles.avatarText, { color: theme.accent }]}>{(name || email || 'P').slice(0, 1).toUpperCase()}</Text>
+      <View style={styles.profileIdentity}>
+        <View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}>
+          <Text style={[styles.avatarText, { color: theme.accent }]}>{(name || email || 'P').slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <View style={styles.flex}>
+          <Text style={[styles.profileName, { color: theme.text }]}>{displayName}</Text>
+          <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
+        </View>
       </View>
-      <View style={styles.flex}>
-        <Text style={[styles.profileName, { color: theme.text }]}>{displayName}</Text>
-        <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
-        <CopyableUserId userId={userId} />
-      </View>
+      <CopyableUserId userId={userId} />
     </View>
   );
 }
@@ -89,8 +91,8 @@ export function AccountItem({
         <View style={styles.flex}>
           <Text style={[styles.itemTitle, { color: theme.text }]}>{title}</Text>
           <Text style={[styles.itemDetail, { color: theme.textMuted }]}>{detail}</Text>
+          {status ? <Text style={[styles.itemStatus, { color: toneColor }]}>{status}</Text> : null}
         </View>
-        {status ? <Text numberOfLines={1} style={[styles.itemStatus, { color: toneColor }]}>{status}</Text> : null}
         {expanded ? <CaretDown size={18} color={theme.textMuted} /> : <CaretRight size={18} color={theme.textMuted} />}
       </PressableScale>
       {expanded ? <View style={[styles.itemBody, { borderTopColor: theme.border }]}>{children}</View> : null}

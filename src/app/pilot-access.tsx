@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ArrowClockwise, CaretRight, MagnifyingGlass, Users } from 'phosphor-react-native';
 import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
@@ -94,24 +95,27 @@ export default function PilotAccessScreen() {
   const selectedAudits = useMemo(() => audits.data?.filter((audit) => audit.userId === selected?.id).slice(0, 8) ?? [], [audits.data, selected?.id]);
   const refreshing = memberships.loading || requests.loading || audits.loading;
 
-  return <DetailScreen title="Pilot access" eyebrow="AUDITED ADMINISTRATION">
+  return <DetailScreen title="Pilot access" eyebrow="ADMINISTRATION">
     <ResourceState loading={memberships.loading} error={memberships.error} />
-    <ActionButton label="Refresh access data" variant="secondary" loading={refreshing} onPress={() => void refresh()} />
+    <View style={styles.toolbar}>
+      <Text style={[styles.copy, { color: theme.textMuted, flex: 1 }]}>Manage pilot members and access requests.</Text>
+      <PressableScale accessibilityRole="button" accessibilityLabel="Refresh access data" accessibilityState={{ busy: refreshing, disabled: refreshing }} disabled={refreshing} onPress={() => void refresh()} style={[styles.refresh, { backgroundColor: theme.field }]}><ArrowClockwise size={20} color={theme.accent} /></PressableScale>
+    </View>
     {message ? <Card><Text accessibilityRole="alert" style={[styles.copy, { color: theme.warning }]}>{message}</Text></Card> : null}
-    <View style={[styles.tabs, { backgroundColor: theme.field }]}>
+    <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.field }]}>
       {(['USERS', 'ADMINS'] as const).map((value) => {
         const disabled = value === 'ADMINS' && !memberships.data?.bootstrapAdmin;
-        return <PressableScale key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value, disabled }} disabled={disabled} onPress={() => setTab(value)} style={[styles.tab, tab === value && { backgroundColor: theme.panelRaised, borderColor: theme.accent }, disabled && styles.disabled]}><Text style={[styles.tabText, { color: tab === value ? theme.accent : theme.textMuted }]}>{value === 'USERS' ? 'Users' : 'Administrators'}</Text></PressableScale>;
+        return <PressableScale key={value} containerStyle={styles.flex} accessibilityRole="tab" accessibilityState={{ selected: tab === value, disabled }} disabled={disabled} onPress={() => { setTab(value); setResults([]); setSelected(null); setReason(''); setQuery(''); setMessage(null); }} style={[styles.tab, tab === value && { backgroundColor: theme.panelRaised, borderColor: theme.accent }, disabled && styles.disabled]}><Text style={[styles.tabText, { color: tab === value ? theme.accent : theme.textMuted }]}>{value === 'USERS' ? `Users (${userMemberships.length})` : `Admins (${adminMemberships.length})`}</Text></PressableScale>;
       })}
     </View>
 
     {tab === 'USERS' ? <>
       {requests.data?.length ? <View style={styles.section}><Text style={[styles.sectionTitle, { color: theme.text }]}>Pending requests</Text>{requests.data.map((request) => <Card key={request.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.name, { color: theme.text }]}>{request.user.name || request.user.email}</Text><Text selectable style={[styles.uuid, { color: theme.textMuted }]}>{request.userId}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Requested {new Date(request.createdAt).toLocaleString()}{'\n'}“{request.reason}”</Text></View><StatusPill label="REQUESTED" tone="warning" /></View><ActionButton label="Review user" variant="secondary" onPress={() => void selectById(request.userId)} /></Card>)}</View> : null}
       <Card>
-        <Text style={[styles.name, { color: theme.text }]}>Find a BetsClaw user</Text>
-        <Text style={[styles.copy, { color: theme.textMuted }]}>Search by name, email, or the immutable UUID shown on their Account page.</Text>
-        <TextInput accessibilityLabel="Search pilot users" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Name, email, or user UUID" placeholderTextColor={theme.textMuted} style={[styles.input, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} onSubmitEditing={() => void search()} />
-        <ActionButton label="Search users" loading={busy === 'search'} disabled={!query.trim() || Boolean(busy)} onPress={() => void search()} />
+        <Text style={[styles.name, { color: theme.text }]}>Find a user</Text>
+        <Text style={[styles.copy, { color: theme.textMuted }]}>Search by name, email, or user ID.</Text>
+        <TextInput accessibilityLabel="Search pilot users" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Name, email, or user ID" returnKeyType="search" placeholderTextColor={theme.textMuted} style={[styles.input, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} onSubmitEditing={() => void search()} />
+        <ActionButton label="Search users" icon={MagnifyingGlass as never} loading={busy === 'search'} disabled={!query.trim() || Boolean(busy)} onPress={() => void search()} />
       </Card>
       {results.map((user) => <Card key={user.id} style={selected?.id === user.id ? { borderColor: theme.accent } : undefined}><View style={styles.between}><View style={styles.flex}><Text style={[styles.name, { color: theme.text }]}>{user.name || user.email}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{user.email} · {user.role}</Text><Text selectable style={[styles.uuid, { color: theme.textMuted }]}>{user.id}</Text></View><StatusPill label={user.grantActive ? 'ACTIVE' : user.pilotUser.active ? 'ENROLLED' : 'NOT ENROLLED'} tone={user.grantActive ? 'success' : 'neutral'} /></View><ActionButton label="Review user" variant="secondary" onPress={() => setSelected(user)} /></Card>)}
       {selected ? <Card>
@@ -122,23 +126,26 @@ export default function PilotAccessScreen() {
           <Requirement label="Live review" value={selected.readiness.approvalStatus} passed={selected.readiness.approvalStatus === 'APPROVED'} />
           <Requirement label="Bot signer" value={selected.readiness.signerStatus} passed={selected.readiness.signerStatus === 'ACTIVE'} />
         </View>
-        <Text style={[styles.copy, { color: theme.textMuted }]}>Safety requirements are computed by the server and cannot be overridden here.</Text>
+        <Text style={[styles.copy, { color: theme.textMuted }]}>Pilot access does not bypass wallet verification or live trading approval.</Text>
         <TextInput accessibilityLabel="Required operator reason" value={reason} onChangeText={setReason} placeholder="Required operator reason" placeholderTextColor={theme.textMuted} multiline style={[styles.input, styles.reason, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} />
+        <View style={styles.section}>
         <ActionButton label={pilotAccessPrimaryAction(selected.grantActive).label} loading={busy === pilotAccessPrimaryAction(selected.grantActive).action} disabled={!reason.trim() || Boolean(busy)} onPress={() => void act(pilotAccessPrimaryAction(selected.grantActive).action, selected)} />
         {selected.grantActive ? <ActionButton label="Revoke pilot access" variant="danger" loading={busy === 'revoke'} disabled={!reason.trim() || Boolean(busy)} onPress={() => void act('revoke', selected)} /> : null}
         <ActionButton label="Open Live Review" variant="secondary" onPress={() => router.push('/live-review' as never)} />
+        </View>
         {selectedAudits.length ? <View style={[styles.audit, { borderTopColor: theme.border }]}><Text style={[styles.sectionTitle, { color: theme.text }]}>Recent membership history</Text>{selectedAudits.map((audit) => <Text key={audit.id} style={[styles.auditLine, { color: theme.textMuted }]}>{audit.action} {audit.kind} v{audit.membershipVersion} · {new Date(audit.createdAt).toLocaleString()}{'\n'}{audit.reason} · {audit.actor.name || audit.actor.email}</Text>)}</View> : null}
       </Card> : null}
-      {userMemberships.length ? <View style={styles.section}><Text style={[styles.sectionTitle, { color: theme.text }]}>Enrolled pilot users</Text>{userMemberships.map((membership) => <MembershipCard key={membership.id} membership={membership} onReview={() => void selectById(membership.userId)} />)}</View> : null}
+      {!memberships.loading && !memberships.error && !userMemberships.length ? <Card><View style={styles.empty}><Users size={28} color={theme.accent} /><Text style={[styles.name, { color: theme.text }]}>No pilot members yet</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Find a user above to review their access.</Text></View></Card> : null}
+      {userMemberships.length ? <View style={styles.section}><Text style={[styles.sectionTitle, { color: theme.text }]}>Enrolled users · {userMemberships.length}</Text>{userMemberships.map((membership) => <MembershipCard key={membership.id} membership={membership} onReview={() => void selectById(membership.userId)} />)}</View> : null}
     </> : <>
-      <Card><Text style={[styles.name, { color: theme.text }]}>Protected administrator boundary</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Only a UUID still present in POLYCLAW_PILOT_ADMIN_USER_IDS can appoint or revoke pilot administrators. The app never edits deployment environment variables or changes a user’s BetsClaw role.</Text></Card>
+      <Card><Text style={[styles.name, { color: theme.text }]}>Protected administrator boundary</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Only a bootstrap administrator can appoint or remove pilot administrators. BetsClaw account roles stay unchanged.</Text></Card>
       <Card>
         <Text style={[styles.name, { color: theme.text }]}>Appoint an administrator</Text>
         <TextInput accessibilityLabel="Search administrator candidate" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="ADMIN email or UUID" placeholderTextColor={theme.textMuted} style={[styles.input, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} onSubmitEditing={() => void search()} />
         <ActionButton label="Find ADMIN user" loading={busy === 'search'} disabled={!query.trim() || Boolean(busy)} onPress={() => void search()} />
       </Card>
       {results.filter((user) => user.role === 'ADMIN').map((user) => <Card key={user.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.name, { color: theme.text }]}>{user.name || user.email}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{user.email}</Text><Text selectable style={[styles.uuid, { color: theme.textMuted }]}>{user.id}</Text></View><StatusPill label={user.pilotAdmin.active ? user.pilotAdmin.source === 'ENV' ? 'BOOTSTRAP' : 'PILOT ADMIN' : 'ELIGIBLE'} tone={user.pilotAdmin.active ? 'success' : 'neutral'} /></View>{!user.pilotAdmin.active ? <><TextInput accessibilityLabel="Administrator appointment reason" value={reason} onChangeText={setReason} placeholder="Required appointment reason" placeholderTextColor={theme.textMuted} multiline style={[styles.input, styles.reason, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} /><ActionButton label="Appoint pilot administrator" disabled={!reason.trim() || Boolean(busy)} loading={busy === 'add-admin'} onPress={() => void act('add-admin', user)} /></> : null}</Card>)}
-      <View style={styles.section}><Text style={[styles.sectionTitle, { color: theme.text }]}>Pilot administrators</Text>{adminMemberships.map((membership) => <Card key={membership.id}><MembershipSummary membership={membership} />{membership.protected ? <Text style={[styles.protected, { color: theme.warning, backgroundColor: theme.warningSoft }]}>Bootstrap protected · edit deployment configuration to remove</Text> : <><TextInput accessibilityLabel={`Revocation reason for ${membership.user.email}`} value={reason} onChangeText={setReason} placeholder="Required revocation reason" placeholderTextColor={theme.textMuted} multiline style={[styles.input, styles.reason, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} /><ActionButton label="Revoke pilot administrator" variant="danger" disabled={!reason.trim() || Boolean(busy)} loading={busy === 'revoke-admin'} onPress={() => void act('revoke-admin', membership.user)} /></>}</Card>)}</View>
+      <View style={styles.section}><Text style={[styles.sectionTitle, { color: theme.text }]}>Pilot administrators</Text>{adminMemberships.map((membership) => <Card key={membership.id}><MembershipSummary membership={membership} />{membership.protected ? <Text style={[styles.protected, { color: theme.warning, backgroundColor: theme.warningSoft }]}>Protected administrator · contact the deployment owner to remove</Text> : <><TextInput accessibilityLabel={`Revocation reason for ${membership.user.email}`} value={reason} onChangeText={setReason} placeholder="Required revocation reason" placeholderTextColor={theme.textMuted} multiline style={[styles.input, styles.reason, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]} /><ActionButton label="Revoke pilot administrator" variant="danger" disabled={!reason.trim() || Boolean(busy)} loading={busy === 'revoke-admin'} onPress={() => void act('revoke-admin', membership.user)} /></>}</Card>)}</View>
     </>}
   </DetailScreen>;
 }
@@ -154,22 +161,35 @@ function MembershipSummary({ membership }: { membership: MembershipItem }) {
 }
 
 function MembershipCard({ membership, onReview }: { membership: MembershipItem; onReview: () => void }) {
-  return <Card><MembershipSummary membership={membership} /><ActionButton label="Review user" variant="secondary" onPress={onReview} /></Card>;
+  const { theme } = usePolyClawTheme();
+  return <PressableScale accessibilityRole="button" accessibilityLabel={`Review ${membership.user.name || membership.user.email}`} onPress={onReview} style={[styles.memberCard, { backgroundColor: theme.panel, borderColor: theme.border }]}>
+    <View style={styles.memberHead}><View style={[styles.avatar, { backgroundColor: theme.accentSoft }]}><Text style={[styles.avatarText, { color: theme.accent }]}>{(membership.user.name || membership.user.email).slice(0, 1).toUpperCase()}</Text></View><View style={styles.flex}><Text style={[styles.name, { color: theme.text }]}>{membership.user.name || membership.user.email}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{membership.user.email}</Text></View><CaretRight size={20} color={theme.textMuted} /></View>
+    <View style={[styles.memberFooter, { borderColor: theme.border }]}><StatusPill label={membership.source === 'ENV' ? 'BOOTSTRAP' : 'ENROLLED'} tone="success" /><Text style={[styles.reviewLink, { color: theme.accent }]}>Review access</Text></View>
+  </PressableScale>;
 }
 
 const styles = StyleSheet.create({
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  refresh: { minWidth: 44, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  memberCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 16 },
+  memberHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: fonts.bold, fontSize: 18 },
+  memberFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  reviewLink: { fontFamily: fonts.semibold, fontSize: 12 },
+  empty: { alignItems: 'center', gap: 8, padding: 16 },
   tabs: { borderRadius: layout.controlRadius, flexDirection: 'row', gap: spacing.xs, padding: spacing.xs },
-  tab: { alignItems: 'center', borderColor: 'transparent', borderRadius: layout.controlRadius, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 46 },
+  tab: { alignItems: 'center', borderColor: 'transparent', borderRadius: layout.controlRadius, borderWidth: 1, justifyContent: 'center', minHeight: 46, paddingHorizontal: 8, paddingVertical: 10 },
   tabText: { fontFamily: fonts.semibold, fontSize: 12 },
   disabled: { opacity: 0.4 },
   section: { gap: spacing.md },
   sectionTitle: { fontFamily: fonts.display, fontSize: 17 },
-  between: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
+  between: { alignItems: 'flex-start', flexDirection: 'column', gap: spacing.md, justifyContent: 'space-between' },
   flex: { flex: 1 },
   name: { fontFamily: fonts.semibold, fontSize: 15 },
   copy: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, marginTop: spacing.xs },
   uuid: { fontFamily: fonts.medium, fontSize: 10.5, lineHeight: 16, marginTop: spacing.xs },
-  input: { borderRadius: layout.controlRadius, borderWidth: 1, fontFamily: fonts.medium, fontSize: 13, minHeight: 50, marginVertical: spacing.md, paddingHorizontal: 14 },
+  input: { borderRadius: layout.controlRadius, borderWidth: 1, fontFamily: fonts.medium, fontSize: 16, minHeight: 50, marginVertical: spacing.md, paddingHorizontal: 14 },
   reason: { minHeight: 78, paddingTop: 14, textAlignVertical: 'top' },
   requirements: { borderBottomWidth: StyleSheet.hairlineWidth, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.md, marginVertical: spacing.md, paddingVertical: spacing.md },
   requirement: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },

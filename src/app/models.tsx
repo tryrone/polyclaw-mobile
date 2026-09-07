@@ -1,3 +1,4 @@
+import { marketLabel } from '@/lib/markets';
 import { CheckCircle2, CircleAlert, CircleDashed, Clock3, Cpu, Database, ShieldX } from '@/components/modern-icons';
 import type { LucideIcon } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
@@ -7,7 +8,7 @@ import { useOperatorResource } from '@/hooks/use-operator-resource';
 import type { ModelConsumerHealth, ModelMarketActivation, ModelMarketMetrics, ModelsData } from '@/lib/types';
 import { fonts, spacing, usePolyClawTheme } from '@/theme';
 
-const MARKETS = ['O15', 'O25', 'U35', 'U45'] as const;
+const MARKETS = ['O15', 'O25', 'U35', 'U45', 'DC_12', 'DC_1X', 'DC_X2'] as const;
 type MarketActivationMode = NonNullable<ModelsData['marketActivationMode']>;
 
 function consumerStatusLabel(status: ModelConsumerHealth['status']) {
@@ -106,7 +107,7 @@ export default function ModelsScreen() {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Holdout comparison</Text>
         <Text style={[styles.detail, { color: theme.textMuted, marginTop: 4 }]}>Lower Brier score and log loss are better.</Text>
       </View>
-      <View style={styles.marketGrid}>{MARKETS.map((market) => <MetricCell key={market} label={market.replace('O', 'Over ').replace('U', 'Under ').replace('15', '1.5').replace('25', '2.5').replace('35', '3.5').replace('45', '4.5')} metrics={metrics[market] ?? {}} />)}</View>
+      <View style={styles.marketGrid}>{MARKETS.map((market) => <MetricCell key={market} label={marketLabel(market)} metrics={metrics[market] ?? {}} />)}</View>
 
       <Card>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Calibration and drift trend</Text>
@@ -148,7 +149,7 @@ function ActivationCard({ activation, activationMode }: { activation: ModelMarke
   const tone = status === 'ACTIVE' ? 'success' : status === 'BLOCKED' || status === 'PAUSED' ? 'danger' : 'warning';
   const performance = activation.performance;
   return <Card style={styles.activationCard} accessible accessibilityLabel={`${activation.marketType} ${status}, ${activation.rolloutPercent} percent rollout`}>
-    <View style={styles.marketHead}><Text style={[styles.marketTitle, { color: theme.text }]}>{activation.marketType.replace('O', 'Over ').replace('U', 'Under ').replace('15', '1.5').replace('25', '2.5').replace('35', '3.5').replace('45', '4.5')}</Text><StatusPill label={status} tone={tone} /></View>
+    <View style={styles.marketHead}><Text style={[styles.marketTitle, { color: theme.text }]}>{marketLabel(activation.marketType)}</Text><StatusPill label={status} tone={tone} /></View>
     <Text style={[styles.version, { color: theme.textSoft }]}>{activation.activeVersion ?? activation.candidateVersion ?? 'No verified artifact'}</Text>
     <MetricRow label="Paper rollout" left={`${activation.rolloutPercent}%`} right={`${performance?.settledForecasts ?? 0} settled`} accent={status === 'ACTIVE'} />
     <MetricRow label="Ensemble Brier" left={score(performance?.ensembleBrier)} right={`ROI ${performance?.policyRoi == null ? '—' : `${(performance.policyRoi * 100).toFixed(1)}%`}`} />

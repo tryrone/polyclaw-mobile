@@ -15,9 +15,21 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "testflight": {
+      "extends": "production",
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_POLYCLAW_ACCESS_MODE": "PILOT",
+        "EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED": "false"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6805225562"
+      }
+    }
   }
 }

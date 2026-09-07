@@ -2,6 +2,8 @@ import { Platform, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowRight, ShieldCheck, SoccerBall } from 'phosphor-react-native';
+import { DoubleChanceOverview } from '@/components/double-chance-overview';
+import { marketLabel, decimalOdds, isDoubleChance } from '@/lib/markets';
 import { PerformanceChart } from '@/components/performance-chart';
 import { ActionButton, Card, Header, Metric, money, percent, ResourceState, Screen, SectionHeading, StatusPill } from '@/components/ui-kit';
 import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
@@ -26,8 +28,9 @@ export default function ConsumerHome() {
       </LinearGradient>
       <Card><View style={styles.between}><View><Text style={[styles.heading, { color: theme.text }]}>7-day equity</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Deposits and withdrawals are excluded from return.</Text></View></View><PerformanceChart series={portfolio.data?.series ?? []} />{features.manualFootballTrading && Platform.OS !== 'web' ? <ActionButton label="Trade a football match" icon={SoccerBall as never} variant="secondary" onPress={() => router.push('/football-trade')} /> : null}</Card>
       {data.profile.botState === 'SETUP' ? <Card variant="raised"><View style={styles.row}><View style={[styles.icon, { backgroundColor: theme.successSoft }]}><ShieldCheck size={23} color={theme.success} weight="fill" /></View><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{data.access.mode === 'PILOT' ? 'Start your pilot paper bot' : 'Start your 7-day paper trial'}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>Choose your risk, set a trade cap, and let the bot simulate eligible Polymarket decisions automatically.</Text></View></View><ActionButton label="Set up my bot" icon={ArrowRight as never} onPress={() => router.push('/bot')} /></Card> : null}
+      {data.doubleChance ? <DoubleChanceOverview items={data.doubleChance} /> : null}
       <SectionHeading title="Latest activity" meta={`${data.positions.length} DECISIONS`} />
-      {data.positions.slice(0, 4).map((position) => <Card key={position.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{position.fixtureLabel}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{position.selectionLabel} · {position.market}</Text></View><StatusPill label={position.status} tone={position.status === 'SETTLED' ? 'success' : position.status === 'SKIPPED' ? 'warning' : 'neutral'} /></View><Text style={[styles.stake, { color: theme.text }]}>{money(position.plannedStakeUsdc)} paper stake</Text></Card>)}
+      {data.positions.slice(0, 4).map((position) => <Card key={position.id}><View style={styles.between}><View style={styles.flex}><Text style={[styles.heading, { color: theme.text }]}>{position.fixtureLabel}</Text><Text style={[styles.copy, { color: theme.textMuted }]}>{marketLabel(position.market)} · {isDoubleChance(position.market) ? `${decimalOdds(position.entryPrice)} odds` : position.selectionLabel}</Text></View><StatusPill label={position.status} tone={position.status === 'SETTLED' ? 'success' : position.status === 'SKIPPED' ? 'warning' : 'neutral'} /></View><Text style={[styles.stake, { color: theme.text }]}>{money(position.plannedStakeUsdc)} paper stake</Text></Card>)}
       {!data.positions.length ? <Card><Text style={[styles.heading, { color: theme.text }]}>Waiting for an eligible decision</Text><Text style={[styles.copy, { color: theme.textMuted }]}>PolyClaw will add a simulated position only after the model, market-price, and your personal risk checks all pass.</Text></Card> : null}
     </> : null}
   </Screen>;

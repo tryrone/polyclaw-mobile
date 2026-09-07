@@ -61,7 +61,7 @@ export function PolyClawWalletProvider({ children }: { children: ReactNode }) {
   const { state, consumer } = useAuth();
   const appId = process.env.EXPO_PUBLIC_PRIVY_APP_ID?.trim();
   const clientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID?.trim();
-  if (!appId || !clientId) return <Context.Provider value={{ configured: false, ready: true, privyUserId: null, ownerAddress: null, ensureOwnerWallet: unavailable, signMessage: unavailable, signTypedData: unavailable }}>{children}</Context.Provider>;
+  if (process.env.EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED === 'false' || !appId || !clientId) return <Context.Provider value={{ configured: false, ready: true, privyUserId: null, ownerAddress: null, ensureOwnerWallet: unavailable, signMessage: unavailable, signTypedData: unavailable }}>{children}</Context.Provider>;
   return (
     <PrivyProvider
       appId={appId}

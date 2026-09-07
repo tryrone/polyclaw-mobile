@@ -9,13 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.betclaw.polyclaw",
-      "buildNumber": "11",
+      "buildNumber": "13",
       "usesAppleSignIn": true,
       "icon": "./assets/images/ios-icon.png",
       "config": {
         "usesNonExemptEncryption": false
       },
-      "appleTeamId": "7289H9JJ4Z"
+      "appleTeamId": "UTCB899C35"
     },
     "android": {
       "package": "com.betclaw.polyclaw",

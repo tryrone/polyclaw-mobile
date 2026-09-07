@@ -2,7 +2,7 @@ import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { LucideIcon } from '@/components/modern-icons';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
 import type { ReactElement } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, layout, radius, spacing, usePolyClawTheme, type Theme } from '@/theme';
 import { haptics, PulsingDot, PressableScale, Skeleton, Staggered, Ticker } from './motion';
 
@@ -11,8 +11,9 @@ const glassAvailable = isGlassEffectAPIAvailable();
 export function Screen({ children, refreshControl }: { children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps> }) {
   const { theme } = usePolyClawTheme();
   const { width } = useWindowDimensions();
-  const gutter = width >= layout.largeScreenBreakpoint ? layout.largeScreenGutter : layout.phoneGutter;
-  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView contentContainerStyle={[styles.screen, { paddingHorizontal: gutter }]} refreshControl={refreshControl}>{children}</ScrollView></SafeAreaView>;
+  const insets = useSafeAreaInsets();
+  const gutter = width >= layout.largeScreenBreakpoint ? spacing.xl : spacing.lg;
+  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: gutter, paddingBottom: Math.max(130, insets.bottom + 96) }]} refreshControl={refreshControl}>{children}</ScrollView></SafeAreaView>;
 }
 
 export function Header({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
@@ -77,11 +78,12 @@ type ActionVariant = 'primary' | 'secondary' | 'danger';
 
 export function ActionButton({ label, icon: Icon, variant = 'primary', loading = false, haptic = 'tap', ...props }: PressableProps & { label: string; icon?: LucideIcon; variant?: ActionVariant; loading?: boolean; haptic?: keyof typeof haptics | null }) {
   const { theme } = usePolyClawTheme();
-  const backgroundColor = variant === 'primary' ? theme.accentStrong : variant === 'danger' ? theme.dangerSoft : theme.field;
-  const color = variant === 'primary' ? theme.accentInk : variant === 'danger' ? theme.danger : theme.text;
+  const muted = props.disabled && !loading;
+  const backgroundColor = muted ? theme.field : variant === 'primary' ? theme.accentStrong : variant === 'danger' ? theme.dangerSoft : theme.field;
+  const color = muted ? theme.textMuted : variant === 'primary' ? theme.accentInk : variant === 'danger' ? theme.danger : theme.text;
   const inactive = props.disabled || loading;
   return (
-    <PressableScale {...props} disabled={inactive} haptic={haptic} containerStyle={{ alignSelf: 'stretch' }} style={({ pressed }) => [styles.button, { backgroundColor, borderColor: variant === 'secondary' ? theme.border : backgroundColor }, inactive && styles.disabled]}>
+    <PressableScale {...props} accessibilityRole="button" accessibilityState={{ ...props.accessibilityState, disabled: Boolean(inactive), busy: loading }} disabled={inactive} haptic={haptic} containerStyle={{ alignSelf: 'stretch' }} style={({ pressed }) => [styles.button, { backgroundColor, borderColor: muted || variant === 'secondary' ? theme.border : backgroundColor }, pressed && { opacity: 0.8 }]}>
       {loading ? <ActivityIndicator color={color} size="small" /> : Icon ? <Icon size={17} color={color} /> : null}
       <Text style={[styles.buttonText, { color }]}>{label}</Text>
     </PressableScale>
@@ -137,7 +139,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.md, padding: spacing.lg },
   raised: { borderWidth: StyleSheet.hairlineWidth },
   glass: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(167,139,250,0.28)' },
-  pill: { paddingHorizontal: 10, height: 28, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  pill: { paddingHorizontal: 10, paddingVertical: 6, minHeight: 28, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   pillText: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1 },
   metric: { minWidth: '45%', flex: 1, gap: 5 },
@@ -145,8 +147,7 @@ const styles = StyleSheet.create({
   metricValue: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.8 },
   detail: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
   button: { minHeight: 50, borderRadius: layout.controlRadius, paddingHorizontal: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  buttonText: { fontFamily: fonts.bold, fontSize: 14 },
-  disabled: { opacity: 0.45 },
+  buttonText: { fontFamily: fonts.bold, fontSize: 14, flexShrink: 1, textAlign: 'center', paddingVertical: 12 },
   empty: { alignItems: 'center', paddingVertical: 32, gap: 6 },
   emptyIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   emptyTitle: { fontFamily: fonts.semibold, fontSize: 16 },

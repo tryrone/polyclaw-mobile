@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { CheckCircle2, CircleX, Clock3 } from '@/components/modern-icons';
 import { StyleSheet, Text, View } from 'react-native';
+import { marketLabel, decimalOdds, isDoubleChance } from '@/lib/markets';
 import { DetailScreen } from '@/components/detail-layout';
 import { ActionButton, Card, Metric, ResourceState, StatusPill, money, percent, shortDate } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
@@ -14,8 +15,9 @@ export default function TradeDetail() {
   const resource = useOperatorResource<Trade>('trades/' + id, 20_000); const trade = resource.data;
   const cancel = async () => { await request('trades/' + id + '/cancel', { method: 'POST', body: { reason: 'Cancelled from PolyClaw mobile' } }); await resource.refresh(); };
   return <DetailScreen title="Trade detail" eyebrow="DECISION TRACE"><ResourceState loading={resource.loading} error={resource.error} stale={resource.stale} />{trade ? <>
-    <Card><View style={styles.row}><StatusPill label={trade.mode} /><StatusPill label={trade.status} tone={trade.status === 'PLANNED' ? 'warning' : trade.status === 'CANCELLED' ? 'danger' : 'success'} /></View><Text style={[styles.fixture, { color: theme.text }]}>{trade.fixtureLabel}</Text><Text style={[styles.market, { color: theme.textMuted }]}>{trade.market} · {trade.side}</Text></Card>
+    <Card><View style={styles.row}><StatusPill label={trade.mode} /><StatusPill label={trade.status} tone={trade.status === 'PLANNED' ? 'warning' : trade.status === 'CANCELLED' ? 'danger' : 'success'} /></View><Text style={[styles.fixture, { color: theme.text }]}>{trade.fixtureLabel}</Text><Text style={[styles.market, { color: theme.textMuted }]}>{marketLabel(trade.market)} · {trade.side}</Text></Card>
     <Card><View style={styles.metrics}><Metric label="Planned stake" value={money(trade.plannedStake)} /><Metric label="Filled size" value={money(trade.filledSize)} /><Metric label="Probability" value={percent(trade.probability)} /><Metric label="Edge" value={percent(trade.edge)} accent /></View></Card>
+    {isDoubleChance(trade.market) ? <Card><Metric label="Decimal odds (before fees)" value={decimalOdds(trade.entryPrice)} /><Row label="Token price" value={`${(trade.entryPrice * 100).toFixed(1)}¢`} /><Row label="Match period" value="90 minutes plus stoppage time" /><Row label="Settlement" value="Underlying Polymarket contract rules, including cancellations" /></Card> : null}
     {trade.probabilityProvenance ? <Card accessible accessibilityLabel="Probability provenance">
       <Text style={[styles.sectionTitle, { color: theme.text }]}>Probability breakdown</Text>
       <Text style={[styles.sectionDetail, { color: theme.textMuted }]}>The applied probability drives the decision. Polymarket price is used only for edge and execution.</Text>

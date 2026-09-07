@@ -18,7 +18,7 @@ function passkeyDomain() {
 
 function validateStoreBuild() {
   const profile = process.env.EAS_BUILD_PROFILE;
-  if (profile !== 'preview' && profile !== 'production') return;
+  if (!['preview', 'production', 'testflight'].includes(profile)) return;
   if (requestedPlatform() === 'android') throw new Error('PolyClaw Android store builds are disabled for the initial release.');
   const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim() ?? '';
   const revenueCatKey = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY?.trim() ?? '';
@@ -28,6 +28,10 @@ function validateStoreBuild() {
   if (!apiUrl.startsWith('https://')) throw new Error('EXPO_PUBLIC_API_URL must use HTTPS for preview and production builds.');
   if (accessMode !== 'PILOT' && !revenueCatKey.startsWith('appl_')) throw new Error('The dedicated PolyClaw RevenueCat iOS appl_ public key is required outside PILOT mode.');
   if (accessMode !== 'PILOT' && productId !== 'polyclaw_bot_monthly') throw new Error('EXPO_PUBLIC_REVENUECAT_PRODUCT_ID must be polyclaw_bot_monthly outside PILOT mode.');
+  if (process.env.EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED === 'false') {
+    if (profile !== 'testflight' || accessMode !== 'PILOT') throw new Error('Wallet-disabled store builds require the TestFlight PILOT profile.');
+    return;
+  }
   if (!process.env.EXPO_PUBLIC_PRIVY_APP_ID?.trim() || !process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID?.trim()) throw new Error('The dedicated PolyClaw Privy app and client IDs are required for preview and production builds.');
   if (!passkeyDomain()) throw new Error('EXPO_PUBLIC_PRIVY_PASSKEY_DOMAIN is required for preview and production builds.');
 }

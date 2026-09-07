@@ -86,8 +86,8 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
     },
     {
       id: 'paper',
-      label: `Paper history (${approval?.paperDays ?? 0}/7 days, ${approval?.settledBotPositions ?? 0}/10 positions)`,
-      detail: 'Build a seven-day, ten-position qualification record',
+      label: 'Paper trading history',
+      detail: `${approval?.paperDays ?? 0} of 7 days · ${approval?.settledBotPositions ?? 0} of 10 settled positions`,
       passed: Boolean(approval && approval.paperDays >= 7 && approval.settledBotPositions >= 10),
     },
     {
@@ -98,13 +98,13 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
     },
     {
       id: 'wallet',
-      label: 'Dedicated wallet, funding, and withdrawal test',
+      label: 'Fund and verify your bot wallet',
       detail: 'Approve the bot wallet, hold $15–$25 pUSD, then confirm the $1 test withdrawal',
       passed: Boolean(approval && !lacks(reviewReasons, 'deposit_wallet_not_funded', 'pilot_wallet_balance_out_of_range', 'owner_withdrawal_test_required', 'deposit_wallet_approvals_pending')),
     },
     {
       id: 'approval',
-      label: 'Admin, engine and platform approval',
+      label: 'Live trading approval',
       detail: account?.approvalStatus === 'PENDING_REVIEW' ? 'Your evidence is waiting for an operator decision' : 'Approval is tied to the exact wallet evidence reviewed',
       passed: Boolean(approval && account?.approvalStatus === 'APPROVED' && approval.globalEngineApproved && approval.platformApproved),
     },

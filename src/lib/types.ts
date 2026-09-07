@@ -19,6 +19,7 @@ export type AuthSession = {
 };
 
 export type ConsumerDashboard = {
+  doubleChance?: { decisionMode?: string | null; market: string; fixtureLabel: string | null; tokenPrice: number | null; probability: number | null; quotedAt: string | null; reason: string }[];
   mode: 'PAPER';
   liveTradingEnabled: false;
   profile: {
@@ -184,6 +185,8 @@ export type QueueData = {
     id: string;
     fixtureId?: string | null;
     gammaId: string;
+    market?: string | null;
+    tokenPrice?: number | null;
     session: string;
     reasons: DecisionCriterion[] | unknown;
     probabilityProvenance?: Trade['probabilityProvenance'];
@@ -271,7 +274,7 @@ export type ModelsData = {
 export type ModelMarketActivation = {
   id: string;
   consumer: 'BETCLAW' | 'POLYCLAW';
-  marketType: 'O15' | 'O25' | 'U35' | 'U45';
+  marketType: 'O15' | 'O25' | 'U35' | 'U45' | 'DC_12' | 'DC_1X' | 'DC_X2';
   candidateVersion: string | null;
   activeVersion: string | null;
   promotionsPaused: boolean;
