@@ -58,7 +58,7 @@ export default function ConsumerHome() {
     }, 'Limits saved. Tap Enable when you are ready.');
   };
 
-  const heroState = !data ? 'SYNCING' : !data.ready ? 'SET_UP' : data.enabled ? 'ACTIVE' : 'PAUSED';
+  const heroState = !data ? 'SYNCING' : !data.ready ? 'SETUP NEEDED' : data.enabled ? 'ACTIVE' : 'PAUSED';
   const heroTone = !data ? 'neutral' : !data.ready ? 'warning' : data.enabled ? 'success' : 'warning';
   const primaryLabel = data?.primaryAction === 'ENABLE' ? 'Enable auto-trade'
     : data?.primaryAction === 'PAUSE' ? 'Pause auto-trade'
@@ -106,12 +106,12 @@ export default function ConsumerHome() {
       ) : null}
 
       {data && data.primaryAction === 'SET_UP' ? (
-        <Card>
+        <Card style={styles.setupCard}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Set your limits</Text>
-          <Text style={[styles.copy, { color: theme.textMuted }]}>
+          <Text style={[styles.copy, styles.setupCopy, { color: theme.textMuted }]}>
             Each published signal places at most your per-trade amount, capped by the platform and your remaining day.
           </Text>
-          <View style={styles.fieldRow}>
+          <View style={[styles.fieldRow, styles.setupFieldRow]}>
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Per trade (USDC)</Text>
               <TextInput
@@ -147,7 +147,6 @@ export default function ConsumerHome() {
       ) : null}
 
       <ActionButton
-        disabled={data?.primaryAction === 'NONE'}
         icon={PrimaryIcon as never}
         label={primaryLabel}
         loading={busy}
@@ -199,4 +198,7 @@ const styles = StyleSheet.create({
   previewTitle: { fontFamily: fonts.semibold, fontSize: 14 },
   previewValue: { fontFamily: fonts.bold, fontSize: 14, ...numeric },
   sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 },
+  setupCard: { gap: spacing.md },
+  setupCopy: { marginTop: 0 },
+  setupFieldRow: { marginTop: 0 },
 });

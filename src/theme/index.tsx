@@ -34,6 +34,8 @@ const light = {
   accentStrong: '#4F48C8',
   accentInk: '#FFFFFF',
   accentSoft: 'rgba(98,91,216,0.10)',
+  /** Native switch thumb; intentionally stable across light and dark tracks. */
+  switchThumb: '#FFFFFF',
   /** Neutralised: primary CTAs render as flat ink, not decorative violet gradients. */
   accentGradient: ['#111111', '#111111'] as [string, string],
   success: '#1F7A45',

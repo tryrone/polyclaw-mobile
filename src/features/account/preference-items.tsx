@@ -1,11 +1,10 @@
 import { StyleSheet, Switch, Text, View } from 'react-native';
-import { Bell, Palette } from 'phosphor-react-native';
-import { PressableScale } from '@/components/motion';
-import { type ThemePreference, usePolyClawTheme } from '@/theme';
+import { Bell } from 'phosphor-react-native';
+import { usePolyClawTheme } from '@/theme';
 import { AccountItem } from './primitives';
 import { accountStyles as styles } from './styles';
 import type { AccountController } from './use-account-controller';
-import { humanize, notificationPreferences } from './utils';
+import { notificationPreferences } from './utils';
 
 export function NotificationItem({ controller }: { controller: AccountController }) {
   const { theme } = usePolyClawTheme();
@@ -45,47 +44,13 @@ export function NotificationItem({ controller }: { controller: AccountController
                   disabled={ui.isBusy}
                   value={values[preference.key]}
                   onValueChange={(next) => void notifications.update(preference.key, next)}
-                  trackColor={{ false: theme.greySoft, true: theme.accentSoft }}
-                  thumbColor={values[preference.key] ? theme.accent : theme.textMuted}
+                  ios_backgroundColor={theme.borderStrong}
+                  trackColor={{ false: theme.borderStrong, true: theme.accent }}
+                  thumbColor={theme.switchThumb}
                 />
               </View>
             ))
           : null}
-      </View>
-    </AccountItem>
-  );
-}
-
-export function AppearanceItem({ controller }: { controller: AccountController }) {
-  const { theme } = usePolyClawTheme();
-  const { appearance, ui } = controller;
-  return (
-    <AccountItem
-      Icon={Palette}
-      title="Appearance"
-      detail="Use your preferred light or dark theme"
-      status={humanize(appearance.preference)}
-      expanded={ui.expanded === 'appearance'}
-      onPress={() => ui.toggleSection('appearance')}
-    >
-      <View accessibilityRole="radiogroup" style={[styles.segmented, { backgroundColor: theme.field }]}>
-        {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => {
-          const selected = appearance.preference === option;
-          return (
-            <PressableScale
-              key={option}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selected }}
-              accessibilityLabel={`${humanize(option)} appearance`}
-              haptic="select"
-              onPress={() => appearance.setPreference(option)}
-              containerStyle={styles.segmentWrap}
-              style={[styles.segment, selected && { backgroundColor: theme.panelRaised, borderColor: theme.borderStrong }]}
-            >
-              <Text style={[styles.segmentText, { color: selected ? theme.text : theme.textMuted }]}>{humanize(option)}</Text>
-            </PressableScale>
-          );
-        })}
       </View>
     </AccountItem>
   );

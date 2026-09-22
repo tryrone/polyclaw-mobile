@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ThemePicker } from '@/components/theme-picker';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
@@ -65,6 +66,10 @@ export default function AdminSettingsScreen() {
       />
       <ResourceState error={control.error} loading={control.loading && !data} />
       {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
+
+      <Card>
+        <ThemePicker />
+      </Card>
 
       <Card>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Platform ceilings</Text>

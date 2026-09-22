@@ -93,20 +93,20 @@ export function SignerItem({ controller }: { controller: AccountController }) {
   return (
     <AccountItem
       Icon={Key}
-      title="Bot authorization"
-      detail={signer.account?.signerExpiresAt ? `Expires ${shortDate(signer.account.signerExpiresAt)}` : 'Permission to place approved trades'}
+      title="Auto-trading authorization"
+      detail={signer.account?.signerExpiresAt ? `Expires ${shortDate(signer.account.signerExpiresAt)}` : 'Permission to place published trades'}
       status={humanize(signer.account?.signerStatus ?? 'not provisioned')}
       tone={signer.account?.signerStatus === 'ACTIVE' ? 'success' : 'neutral'}
       expanded={expanded}
       onPress={() => ui.toggleSection('signer')}
     >
       <Text style={[styles.body, { color: theme.textMuted }]}>
-        Give the bot permission to place and close approved trades. Withdrawals stay under your control.
+        Allow PolyClaw to place admin-published trades within your limits and close those positions. Withdrawals stay under your control.
       </Text>
       <View style={styles.actionStack}>
         {signer.account?.mode === 'LIVE' ? (
           <ActionButton
-            label="Pause live bot"
+            label="Pause auto-trading"
             variant="secondary"
             loading={ui.busy === 'disable'}
             disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'disable')}
@@ -114,7 +114,7 @@ export function SignerItem({ controller }: { controller: AccountController }) {
           />
         ) : signer.account?.signerStatus === 'ACTIVE' ? (
           <ActionButton
-            label="Enable Live Bot"
+            label="Enable auto-trading"
             loading={ui.busy === 'enable'}
             disabled={ui.readOnly || (ui.isBusy && ui.busy !== 'enable')}
             onPress={() => void signer.enable()}

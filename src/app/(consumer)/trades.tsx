@@ -87,6 +87,7 @@ export default function ConsumerTradesScreen() {
           );
         })}
       </View>
+      {detailError ? <Text style={[styles.error, { color: theme.danger }]}>{detailError}</Text> : null}
 
       {rows.length ? (
         rows.map((row) => (
@@ -112,7 +113,6 @@ export default function ConsumerTradesScreen() {
             {detail?.id === row.id ? (
               <Card>
                 <DetailRows detail={detail} />
-                {detailError ? <Text style={[styles.error, { color: theme.danger }]}>{detailError}</Text> : null}
                 <ActionButton
                   disabled={!detail.canClose}
                   label={detail.canClose ? 'Close position' : 'No open position'}

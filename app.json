@@ -2,14 +2,14 @@
   "expo": {
     "name": "PolyClaw",
     "slug": "polyclaw-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "polyclaw",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.betclaw.polyclaw",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "usesAppleSignIn": true,
       "icon": "./assets/images/ios-icon.png",
       "config": {

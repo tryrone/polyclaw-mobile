@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { fonts, layout, radius, spacing } from '@/theme';
+import { fonts, radius, spacing } from '@/theme';
 
 export const accountStyles = StyleSheet.create({
   profileCard: {
@@ -68,21 +68,10 @@ export const accountStyles = StyleSheet.create({
   quizRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 48 },
   quizBox: { borderRadius: 6, borderWidth: 1.5, height: 21, width: 21 },
   quizText: { flex: 1, fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 18 },
-  preference: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 66 },
+  preference: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 64 },
+  preferenceInset: { padding: spacing.md },
   preferenceName: { fontFamily: fonts.medium, fontSize: 13 },
   preferenceDetail: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, marginTop: 2 },
-  segmented: { borderRadius: layout.controlRadius, flexDirection: 'row', gap: spacing.xs, padding: spacing.xs },
-  segmentWrap: { flex: 1 },
-  segment: {
-    alignItems: 'center',
-    borderColor: 'transparent',
-    borderRadius: layout.controlRadius,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-  },
-  segmentText: { fontFamily: fonts.semibold, fontSize: 12 },
   dangerCopy: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   versionNote: { fontFamily: fonts.medium, fontSize: 10.5, lineHeight: 16, textAlign: 'center' },
 });

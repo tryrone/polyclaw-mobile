@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Receipt, SlidersHorizontal, SoccerBall, Users } from 'phosphor-react-native';
+import { ChartLineUp, GearSix, SoccerBall, UsersThree } from 'phosphor-react-native';
 
 import { PolyClawTabBar, type TabItem } from '@/components/tab-bar';
 import { useAuth } from '@/auth/provider';
@@ -13,9 +13,9 @@ import { useAuth } from '@/auth/provider';
  */
 const tabs: (TabItem & { name: string })[] = [
   { name: 'games', href: '/admin/games', label: 'Games', Icon: SoccerBall },
-  { name: 'trades', href: '/admin/trades', label: 'Trades', Icon: Receipt },
-  { name: 'users', href: '/admin/users', label: 'Users', Icon: Users },
-  { name: 'settings', href: '/admin/settings', label: 'Settings', Icon: SlidersHorizontal },
+  { name: 'trades', href: '/admin/trades', label: 'Trades', Icon: ChartLineUp },
+  { name: 'users', href: '/admin/users', label: 'Users', Icon: UsersThree },
+  { name: 'settings', href: '/admin/settings', label: 'Settings', Icon: GearSix },
 ];
 
 export default function AdminLayout() {

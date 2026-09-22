@@ -1,10 +1,12 @@
+import { randomUUID } from 'expo-crypto';
 import { useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
+import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
-import type { AdminDeliveryRow } from '@/lib/types';
+import type { AdminDeliveryRow, AdminSignalBatch } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 const filters = ['ALL', 'OPEN', 'FILLED', 'FAILED', 'SKIPPED'] as const;
@@ -16,14 +18,76 @@ type Filter = (typeof filters)[number];
  */
 export default function AdminTradesScreen() {
   const { theme } = usePolyClawTheme();
+  const { admin } = useAuth();
   const [filter, setFilter] = useState<Filter>('ALL');
+  const [message, setMessage] = useState<string | null>(null);
+  const [cancellingBatchId, setCancellingBatchId] = useState<string | null>(null);
+  const [retryBatch, setRetryBatch] = useState<AdminSignalBatch | null>(null);
   const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', filter === 'ALL' ? { limit: 150 } : { status: filter, limit: 150 }, 20_000);
+  const published = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'PUBLISHED', limit: 30 }, 20_000);
   const rows = resource.data ?? [];
+
+  const cancelBatch = async (batch: AdminSignalBatch) => {
+    setCancellingBatchId(batch.id);
+    try {
+      const result = await admin<AdminSignalBatch & { venueCancellation: { cancelled: number; failed: number } }>('cancelBatch', {
+        batchId: batch.id,
+        reason: 'Cancelled by the publisher from the PolyClaw admin app.',
+        idempotencyKey: randomUUID(),
+        confirmed: true,
+      });
+      if (result.venueCancellation.failed > 0) {
+        setMessage(`${result.venueCancellation.failed} venue order${result.venueCancellation.failed === 1 ? '' : 's'} could not be cancelled. Tap Retry venue cancellation.`);
+        setRetryBatch(batch);
+      } else {
+        setMessage(`Batch cancelled. ${result.venueCancellation.cancelled} open venue order${result.venueCancellation.cancelled === 1 ? '' : 's'} cancelled.`);
+        setRetryBatch(null);
+      }
+      await Promise.all([published.refresh(), resource.refresh()]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Batch cancellation failed.');
+    } finally {
+      setCancellingBatchId(null);
+    }
+  };
+
+  const confirmCancellation = (batch: AdminSignalBatch) => {
+    Alert.alert(
+      'Cancel this batch?',
+      'Pending trades will be stopped and PolyClaw will try to cancel every open venue order. Filled exposure remains open for settlement.',
+      [{ text: 'Keep batch', style: 'cancel' }, { text: 'Cancel batch', style: 'destructive', onPress: () => void cancelBatch(batch) }],
+    );
+  };
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
       <Header title="Trades" />
       <ResourceState error={resource.error} loading={resource.loading && !rows.length} />
+      {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
+      {retryBatch ? (
+        <ActionButton
+          label="Retry venue cancellation"
+          loading={cancellingBatchId === retryBatch.id}
+          onPress={() => void cancelBatch(retryBatch)}
+          variant="secondary"
+        />
+      ) : null}
+
+      {published.data?.length ? (
+        <View style={styles.batchSection}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Published batches</Text>
+          {published.data.map((batch) => (
+            <View key={batch.id} style={[styles.batchRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.flex}>
+                <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{batch.title ?? 'Untitled batch'}</Text>
+                <Text style={[styles.sub, { color: theme.textMuted }]}>{batch.signalCount} signals · published {batch.publishedAt ? new Date(batch.publishedAt).toLocaleString() : 'recently'}</Text>
+              </View>
+              <ActionButton label="Cancel batch" loading={cancellingBatchId === batch.id} onPress={() => confirmCancellation(batch)} variant="secondary" />
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.filterRow}>
         {filters.map((item) => {
           const active = filter === item;
@@ -63,14 +127,18 @@ export default function AdminTradesScreen() {
 }
 
 const styles = StyleSheet.create({
+  batchRow: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
+  batchSection: { gap: spacing.xs, marginBottom: spacing.md },
   failure: { fontFamily: fonts.medium, fontSize: 11.5, marginTop: 3 },
   figure: { fontFamily: fonts.bold, fontSize: 14.5, ...numeric },
   filter: { alignItems: 'center', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.md },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
   filterText: { fontFamily: fonts.bold, fontSize: 12 },
   flex: { flex: 1, minWidth: 0 },
+  message: { fontFamily: fonts.medium, fontSize: 12.5, marginBottom: spacing.sm },
   right: { alignItems: 'flex-end', gap: 6 },
   row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm },
+  sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 },
   sub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
   title: { fontFamily: fonts.semibold, fontSize: 14 },
 });

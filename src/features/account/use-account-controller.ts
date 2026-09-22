@@ -11,7 +11,6 @@ import {
 import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
 import type { ConsumerAccount, DepositSetup, OwnerActionPreparation } from '@/lib/types';
-import { usePolyClawTheme } from '@/theme';
 import { usePolyClawWallet } from '@/wallet/privy-provider';
 import type { AccountMessage, AccountSectionKey, BusyOperation, RiskAcknowledgements } from './types';
 import {
@@ -28,7 +27,6 @@ const initialRiskAcknowledgements: RiskAcknowledgements = {
 };
 
 export function useAccountController() {
-  const { preference, setPreference } = usePolyClawTheme();
   const { session, signOut, consumer, biometricSupported, biometricRequired, recoveryMode, unlockWithBiometric } = useAuth();
   const ownerWallet = usePolyClawWallet();
   const account = useConsumerResource<ConsumerAccount>('account', undefined, 45_000);
@@ -237,32 +235,17 @@ export function useAccountController() {
       }, 'Bot signer authorized for 30 days. It cannot withdraw funds.')),
       revoke: () => protectedRun(() => run('revoke', () => consumer('revokeSigner'), 'Signer revocation started.')),
       enable: () => protectedRun(() => run('enable', async () => {
-        await consumer('prepareCancellationPreflight', { idempotencyKey: randomUUID() });
-        let preflightStatus = 'PLACED';
-        const reconciliationDeadline = Date.now() + 15_000;
-        while (Date.now() < reconciliationDeadline) {
-          const preflight = await consumer<{ status?: string } | null>('cancellationPreflightStatus');
-          preflightStatus = preflight?.status ?? 'MISSING';
-          if (preflightStatus === 'CANCELLED') break;
-          if (preflightStatus === 'FAILED') throw new Error('The cancellation preflight failed and live activation remains blocked.');
-          await new Promise((resolve) => setTimeout(resolve, 1_000));
-        }
-        if (preflightStatus !== 'CANCELLED') throw new Error('Cancellation confirmation is still pending. Retry live activation after the venue reconciles it.');
         const prepared = await consumer<{ activationPayload: string }>('prepareLiveActivation', { platform: 'IOS' });
         const ownerSignature = await ownerWallet.signMessage(prepared.activationPayload);
         await consumer('enableLiveBot', { platform: 'IOS', activationPayload: prepared.activationPayload, ownerSignature });
-      }, 'Live bot enabled.')),
-      disable: () => run('disable', () => consumer('disableLiveBot'), 'New live bot entries paused.'),
+      }, 'Auto-trading authorization enabled.')),
+      disable: () => run('disable', () => consumer('disableLiveBot'), 'New auto-trading entries paused.'),
     },
     notifications: {
       values: account.data?.notifications,
       enabledCritical: countEnabledCriticalNotifications(account.data?.notifications),
       totalCritical: criticalNotificationTotal,
       update: updateNotification,
-    },
-    appearance: {
-      preference,
-      setPreference,
     },
     controls: {
       hasLinkedWallet: Boolean(account.data?.readOnlyAddress),

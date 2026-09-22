@@ -1,6 +1,7 @@
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { SignOut } from 'phosphor-react-native';
 
+import { ThemePicker } from '@/components/theme-picker';
 import { ActionButton, Header, ResourceState, Screen } from '@/components/ui-kit';
 import { SignerItem } from '@/features/account/access-items';
 import { SubscriptionItem, WalletItem } from '@/features/account/membership-items';
@@ -34,6 +35,9 @@ export default function ConsumerAccountScreen() {
       </SettingsGroup>
 
       <SettingsGroup title="Preferences">
+        <View style={styles.preferenceInset}>
+          <ThemePicker />
+        </View>
         <NotificationItem controller={controller} />
         <SafetyItem controller={controller} />
         <AccountControlsItem controller={controller} />

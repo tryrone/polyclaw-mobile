@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, Receipt, UserCircle } from 'phosphor-react-native';
+import { ArrowsLeftRight, HouseSimple, User } from 'phosphor-react-native';
 
 import { PolyClawTabBar, type TabItem } from '@/components/tab-bar';
 import { useAuth } from '@/auth/provider';
@@ -9,9 +9,9 @@ import { useAuth } from '@/auth/provider';
  * Portfolio, Activity, Wallet, Getting Started and Football Trade screens are removed.
  */
 const tabs: (TabItem & { name: string })[] = [
-  { name: 'home', href: '/home', label: 'Home', Icon: House },
-  { name: 'trades', href: '/trades', label: 'Trades', Icon: Receipt },
-  { name: 'account', href: '/account', label: 'Account', Icon: UserCircle },
+  { name: 'home', href: '/home', label: 'Home', Icon: HouseSimple },
+  { name: 'trades', href: '/trades', label: 'Trades', Icon: ArrowsLeftRight },
+  { name: 'account', href: '/account', label: 'Account', Icon: User },
 ];
 
 export default function ConsumerLayout() {
