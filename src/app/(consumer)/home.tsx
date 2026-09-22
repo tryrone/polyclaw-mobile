@@ -58,7 +58,10 @@ export default function ConsumerHome() {
     }, 'Limits saved. Tap Enable when you are ready.');
   };
 
-  const heroState = !data ? 'SYNCING' : !data.ready ? 'SETUP NEEDED' : data.enabled ? 'ACTIVE' : 'PAUSED';
+  const heroState = !data ? 'SYNCING'
+    : !data.ready ? 'SETUP NEEDED'
+      : data.executionMode === 'PAPER' ? (data.enabled ? 'PAPER ACTIVE' : 'PAPER READY')
+        : data.enabled ? 'ACTIVE' : 'PAUSED';
   const heroTone = !data ? 'neutral' : !data.ready ? 'warning' : data.enabled ? 'success' : 'warning';
   const primaryLabel = data?.primaryAction === 'ENABLE' ? 'Enable auto-trade'
     : data?.primaryAction === 'PAUSE' ? 'Pause auto-trade'
@@ -69,7 +72,7 @@ export default function ConsumerHome() {
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
-      <Header action={<StatusPill label={heroState} live={heroState === 'ACTIVE'} tone={heroTone} />} title="Auto-trade" />
+      <Header action={<StatusPill label={heroState} live={data?.enabled} tone={heroTone} />} title="Auto-trade" />
       <ResourceState error={resource.error} loading={resource.loading} />
 
       <View style={[styles.hero, { backgroundColor: theme.text }]}>
@@ -88,7 +91,7 @@ export default function ConsumerHome() {
             <Text style={[styles.heroCellValue, { color: theme.background }]}>{data?.openTrades ?? 0}</Text>
           </View>
           <View style={styles.heroCell}>
-            <Text style={[styles.heroCellLabel, { color: theme.background }]}>Wallet</Text>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>{data?.executionMode === 'PAPER' ? 'Paper funds' : 'Wallet'}</Text>
             <Text style={[styles.heroCellValue, { color: theme.background }]}>{money(data?.wallet.availablePusd ?? 0)}</Text>
           </View>
         </View>

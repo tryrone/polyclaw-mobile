@@ -303,6 +303,7 @@ export type ConsumerReadinessBlocker = { code: string; label: string; cta: PolyC
 export type ConsumerHomeStatus = {
   ready: boolean;
   enabled: boolean;
+  executionMode: 'PAPER' | 'LIVE';
   primaryAction: PolyClawPrimaryAction;
   blockers: ConsumerReadinessBlocker[];
   wallet: { status: string; availablePusd: number; depositWalletAddress: string | null };

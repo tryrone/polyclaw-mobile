@@ -8,30 +8,34 @@ import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminEligibilityRow, AdminPublisher } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
+type PublisherStatus = { isAdministrator: boolean; granted: boolean; status: string | null; grantedAt: string | null };
+
 /**
  * Users: eligibility with concise blocking reasons, plus publisher grants. Publisher
  * permission is separate from the broad ADMIN role and is granted explicitly here.
  */
 export default function AdminUsersScreen() {
   const { theme } = usePolyClawTheme();
-  const { admin } = useAuth();
+  const { admin, session } = useAuth();
   const [query, setQuery] = useState('');
   const directory = useAdminResource<AdminEligibilityRow[]>('eligibilityDirectory', undefined, 30_000);
   const publishers = useAdminResource<AdminPublisher[]>('listPublishers', undefined, 60_000);
+  const publisherStatus = useAdminResource<PublisherStatus>('publisherStatus', undefined, 60_000);
   const [grantUserId, setGrantUserId] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const rows = (directory.data ?? []).filter((row) => !query.trim() || `${row.email} ${row.name ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()));
 
-  const grant = async () => {
-    if (!grantUserId.trim()) { setMessage('Enter the user id to grant publisher access.'); return; }
+  const grant = async (requestedUserId?: string) => {
+    const userId = requestedUserId?.trim() || grantUserId.trim();
+    if (!userId) { setMessage('Enter the user id to grant publisher access.'); return; }
     setBusy(true);
     try {
-      await admin('grantPublisher', { userId: grantUserId.trim(), reason: 'Granted from admin Users tab', idempotencyKey: randomUUID(), confirmed: true });
+      await admin('grantPublisher', { userId, reason: userId === session?.user.id ? 'Administrator enabled their publisher access' : 'Granted from admin Users tab', idempotencyKey: randomUUID(), confirmed: true });
       setMessage('Publisher grant created.');
       setGrantUserId('');
-      await publishers.refresh();
+      await Promise.all([publishers.refresh(), publisherStatus.refresh()]);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Grant failed.');
     } finally {
@@ -84,6 +88,16 @@ export default function AdminUsersScreen() {
         <Text style={[styles.copy, { color: theme.textMuted }]}>
           Publishers can assemble, validate, publish and cancel signal batches. This is separate from the broad admin role.
         </Text>
+        <View style={[styles.row, { borderBottomColor: theme.border }]}>
+          <View style={styles.flex}>
+            <Text style={[styles.title, { color: theme.text }]}>Your publishing access</Text>
+            <Text style={[styles.sub, { color: theme.textMuted }]}>{publisherStatus.data?.granted ? 'You can create and publish game lists.' : 'Enable this before creating your first list.'}</Text>
+          </View>
+          <StatusPill label={publisherStatus.data?.granted ? 'Enabled' : 'Off'} tone={publisherStatus.data?.granted ? 'success' : 'warning'} />
+        </View>
+        {!publisherStatus.data?.granted ? (
+          <ActionButton label="Enable publishing for me" loading={busy} onPress={() => void grant(session?.user.id)} />
+        ) : null}
         <TextInput
           accessibilityLabel="User id to grant publisher access"
           autoCapitalize="none"
@@ -93,7 +107,7 @@ export default function AdminUsersScreen() {
           style={[styles.input, { borderColor: theme.border, color: theme.text }]}
           value={grantUserId}
         />
-        <ActionButton label="Grant publisher" loading={busy} onPress={() => void grant()} />
+        <ActionButton label="Grant another publisher" loading={busy} onPress={() => void grant()} variant="secondary" />
         {(publishers.data ?? []).map((publisher) => (
           <View key={publisher.userId} style={[styles.row, { borderBottomColor: theme.border }]}>
             <View style={styles.flex}>

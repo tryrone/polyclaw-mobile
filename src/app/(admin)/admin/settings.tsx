@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SignOut } from 'phosphor-react-native';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ThemePicker } from '@/components/theme-picker';
@@ -17,7 +18,7 @@ type AuditRow = { id: string; subjectUserId: string; actorId: string; action: st
  */
 export default function AdminSettingsScreen() {
   const { theme } = usePolyClawTheme();
-  const { admin } = useAuth();
+  const { admin, signOut } = useAuth();
   const control = useAdminResource<AdminPlatformControl>('platformControl', undefined, 30_000);
   const connections = useAdminResource<AdminConnections>('connections', undefined, 60_000);
   const audit = useAdminResource<AuditRow[]>('publisherAudit', { limit: 25 }, 60_000);
@@ -117,6 +118,14 @@ export default function AdminSettingsScreen() {
           </View>
         )) : <Text style={[styles.copy, { color: theme.textMuted }]}>No publisher or platform audit entries yet.</Text>}
       </Card>
+
+      <ActionButton
+        disabled={busy}
+        icon={SignOut as never}
+        label="Sign out"
+        onPress={() => void signOut()}
+        variant="secondary"
+      />
     </Screen>
   );
 }
