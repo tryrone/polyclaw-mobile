@@ -1,0 +1,79 @@
+name: Release PolyClaw iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: Native TestFlight build or compatible production OTA update
+        required: true
+        type: choice
+        options: [native, update]
+        default: native
+      message:
+        description: Human-readable release message
+        required: true
+        type: string
+      runtime_compatible:
+        description: Confirm an OTA update has no native dependency or configuration changes
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: polyclaw-mobile-ios-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Enforce OTA compatibility confirmation
+        if: inputs.release_type == 'update' && !inputs.runtime_compatible
+        run: |
+          echo "Production OTA updates require an explicit runtime-compatibility confirmation." >&2
+          exit 1
+      - name: Build and submit pilot TestFlight release
+        if: inputs.release_type == 'native'
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          npx eas-cli@20.5.1 build --platform ios --profile testflight \
+            --non-interactive --wait --auto-submit-with-profile production
+      - name: Publish runtime-compatible production update
+        if: inputs.release_type == 'update'
+        run: |
+          npx eas-cli@20.5.1 update --channel production --environment production \
+            --message "$RELEASE_MESSAGE" --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+          RELEASE_MESSAGE: ${{ inputs.message }}
+          EXPO_PUBLIC_POLYCLAW_ACCESS_MODE: PILOT
+          EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED: "false"
+      - name: Record source evidence
+        run: |
+          {
+            echo "### PolyClaw iOS release"
+            echo "- source revision: $GITHUB_SHA"
+            echo "- bundle: com.betclaw.polyclaw"
+            echo "- release type: ${{ inputs.release_type }}"
+            echo "- access mode: PILOT for native TestFlight builds"
+            echo "- App Store processing: verify separately for native builds"
+          } >> "$GITHUB_STEP_SUMMARY"

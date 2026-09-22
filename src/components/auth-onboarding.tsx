@@ -233,7 +233,7 @@ export function AuthPrimaryButton({ label, loading = false, ...props }: Pressabl
       disabled={inactive}
       style={({ pressed }) => [styles.primaryButton, inactive && styles.disabled, pressed && styles.primaryButtonPressed]}>
       <LinearGradient
-        colors={theme.mode === 'dark' ? ['#4776FF', '#8BE7F7'] : ['#5B5FEF', '#67E8F9']}
+        colors={theme.accentGradient}
         end={{ x: 1, y: 0.5 }}
         start={{ x: 0, y: 0.5 }}
         style={styles.primaryButtonFill}>

@@ -12,11 +12,21 @@ const links = [{ label: 'Models', detail: 'Shared ensemble health and shadow gat
 export default function MoreScreen() {
   const { theme, preference, setPreference } = usePolyClawTheme(); const { session, signOut } = useAuth();
   return <Screen><Header eyebrow="SETTINGS & CONTROL" title="More" />
-    <Card>{links.map(({ label, detail, route, icon: Icon }, index) => (
-      <PressableScale key={route} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={detail} onPress={() => router.push(route as never)} containerStyle={[styles.linkWrap, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
-        <View style={styles.link}><View style={[styles.linkIcon, { backgroundColor: theme.accentSoft }]}><Icon size={18} color={theme.accent} /></View><View style={{ flex: 1 }}><Text style={[styles.label, { color: theme.text }]}>{label}</Text><Text style={[styles.detail, { color: theme.textMuted }]}>{detail}</Text></View><ChevronRight size={17} color={theme.textMuted} /></View>
-      </PressableScale>
-    ))}</Card>
+    {[
+      { title: 'TRADING SURFACES', items: links.slice(0, 4) },
+      { title: 'OPERATIONS & EVIDENCE', items: links.slice(4) },
+    ].map((group) => (
+      <View key={group.title} style={styles.groupSection}>
+        <Text style={[styles.groupLabel, { color: theme.textMuted }]}>{group.title}</Text>
+        <Card>
+          {group.items.map(({ label, detail, route, icon: Icon }, index) => (
+            <PressableScale key={route} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={detail} onPress={() => router.push(route as never)} containerStyle={[styles.linkWrap, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
+              <View style={styles.link}><View style={[styles.linkIcon, { backgroundColor: theme.accentSoft }]}><Icon size={18} color={theme.accent} /></View><View style={{ flex: 1 }}><Text style={[styles.label, { color: theme.text }]}>{label}</Text><Text style={[styles.detail, { color: theme.textMuted }]}>{detail}</Text></View><ChevronRight size={17} color={theme.textMuted} /></View>
+            </PressableScale>
+          ))}
+        </Card>
+      </View>
+    ))}
     <Card>
       <PressableScale accessibilityRole="button" onPress={() => { haptics.select(); setPreference(preference === 'dark' ? 'light' : 'dark'); }} haptic={null} containerStyle={styles.linkWrap}>
         <View style={styles.link}>
@@ -35,4 +45,4 @@ export default function MoreScreen() {
     <ActionButton label="Sign out" icon={LogOut} variant="secondary" onPress={() => void signOut()} />
   </Screen>;
 }
-const styles = StyleSheet.create({ linkWrap: { alignSelf: 'stretch' }, link: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 6 }, linkIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, label: { fontFamily: fonts.semibold, fontSize: 14 }, detail: { fontFamily: fonts.regular, fontSize: 11, marginTop: 4 }, account: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 1.2 }, email: { fontFamily: fonts.medium, fontSize: 14, marginTop: 6 } });
+const styles = StyleSheet.create({ groupSection: { gap: 8 }, groupLabel: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1, marginLeft: 4 }, linkWrap: { alignSelf: 'stretch' }, link: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 6 }, linkIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, label: { fontFamily: fonts.semibold, fontSize: 14 }, detail: { fontFamily: fonts.regular, fontSize: 11, marginTop: 4 }, account: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 1.2 }, email: { fontFamily: fonts.medium, fontSize: 14, marginTop: 6 } });

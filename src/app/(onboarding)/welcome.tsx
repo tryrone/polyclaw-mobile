@@ -87,12 +87,12 @@ export default function WelcomeScreen() {
             <PressableScale
               accessibilityLabel="Create a PolyClaw account"
               accessibilityRole="button"
-              containerStyle={styles.primaryContainer}
+              containerStyle={[styles.primaryContainer, { shadowColor: theme.accent }]}
               onPress={() => router.push('/(onboarding)/sign-up' as never)}
               style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-              <LinearGradient colors={['#4776FF', '#8BE7F7']} end={{ x: 1, y: 0.5 }} start={{ x: 0, y: 0.5 }} style={styles.primaryFill}>
-                <Text maxFontSizeMultiplier={1.25} style={styles.primaryLabel}>Create account</Text>
-                <ArrowRight color="#07101D" size={19} />
+              <LinearGradient colors={theme.accentGradient} end={{ x: 1, y: 0.5 }} start={{ x: 0, y: 0.5 }} style={styles.primaryFill}>
+                <Text maxFontSizeMultiplier={1.25} style={[styles.primaryLabel, { color: theme.accentInk }]}>Create account</Text>
+                <ArrowRight color={theme.accentInk} size={19} />
               </LinearGradient>
             </PressableScale>
             <PressableScale

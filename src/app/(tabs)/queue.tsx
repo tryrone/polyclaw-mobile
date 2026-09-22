@@ -3,6 +3,7 @@ import { CheckCircle2, CircleX, Microscope } from '@/components/modern-icons';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Staggered } from '@/components/motion';
+import { Disclosure } from '@/components/disclosure';
 import { TradeCard } from '@/components/trade-card';
 import { Card, EmptyState, Header, ResourceState, Screen, SectionHeading, StatusPill, percent, shortDate } from '@/components/ui-kit';
 import { useOperatorResource } from '@/hooks/use-operator-resource';
@@ -34,8 +35,9 @@ export default function QueueScreen() {
       </View>) : !resource.loading ? <EmptyState title="Queue is clear" detail="New trades appear only after research, pricing, and risk checks pass." /> : null}
 
       {resource.data?.noBet.length ? (
-        <>
-          <SectionHeading title="No-bet decisions" meta={`${resource.data.noBet.length} FAIL-CLOSED`} />
+        <Disclosure
+          detail="Failed criteria, observed values, thresholds and provenance — fail-closed, not an error"
+          label={`${resource.data.noBet.length} no-bet decisions`}>
           {resource.data.noBet.map((item, index) => {
             const allCriteria = criteria(item.reasons);
             const failed = allCriteria.filter((criterion) => !criterion.pass);
@@ -77,7 +79,7 @@ export default function QueueScreen() {
               </Staggered>
             );
           })}
-        </>
+        </Disclosure>
       ) : null}
     </Screen>
   );

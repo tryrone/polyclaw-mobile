@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.displayExtraBold, fontSize: 30, letterSpacing: -1.2 },
   card: { borderWidth: 1, borderRadius: radius.md, padding: spacing.lg },
   raised: { borderWidth: StyleSheet.hairlineWidth },
-  glass: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(167,139,250,0.28)' },
+  glass: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(140,140,160,0.24)' },
   pill: { paddingHorizontal: 10, paddingVertical: 6, minHeight: 28, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   pillText: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1 },
