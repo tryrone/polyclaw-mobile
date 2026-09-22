@@ -18,14 +18,14 @@ export function SafetyItem({ controller }: { controller: AccountController }) {
       onPress={() => ui.toggleSection('safety')}
     >
       <Text style={[styles.body, { color: theme.textMuted }]}>
-        Paper performance is simulated and never guarantees future returns. Live trading remains gated by eligibility, wallet, risk, platform, and operational checks.
+        Trading remains gated by your subscription, consent, limits, funded wallet, signer, jurisdiction, and platform safety controls.
       </Text>
       <Text accessibilityRole={controller.security.recoveryMode ? 'alert' : undefined} style={[styles.body, { color: controller.security.recoveryMode ? theme.warning : theme.textMuted }]}>
         {controller.security.recoveryMode
           ? 'Recovery access is active. Portfolio, cancellation, closes, withdrawals, and sign-out remain available; live activation and pilot decisions are blocked until biometrics are re-enrolled.'
           : controller.security.biometricRequired
             ? 'Biometric app unlock is mandatory for this pilot or live account. Device-passcode fallback is disabled.'
-            : 'Biometric app unlock is optional while this account remains paper-only.'}
+            : 'Biometric app unlock is optional for this account.'}
       </Text>
       <Text style={[styles.body, { color: theme.textMuted }]}>
         Contact support before trading if approval, order, wallet, or ledger information looks wrong.

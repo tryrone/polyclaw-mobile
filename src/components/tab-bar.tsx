@@ -1,5 +1,4 @@
 import { usePathname, useRouter } from 'expo-router';
-import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { Icon } from 'phosphor-react-native';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -9,12 +8,12 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale, useReducedMotion } from '@/components/motion';
-import { fonts, layout, motion, radius, spacing, usePolyClawTheme } from '@/theme';
+import { fonts, layout, radius, spacing, usePolyClawTheme } from '@/theme';
 
 export type TabItem = {
   /** Pathname that the item navigates to. */
@@ -25,7 +24,6 @@ export type TabItem = {
   active?: string[];
 };
 
-const glassAvailable = isGlassEffectAPIAvailable();
 const ICON_SLOT = { height: 30, width: 56 } as const;
 
 function isActive(item: TabItem, pathname: string) {
@@ -35,9 +33,9 @@ function isActive(item: TabItem, pathname: string) {
 }
 
 /**
- * One tab. The active state is carried by a soft pill that springs in behind the icon, an
- * animated regular → fill icon cross-fade, and a colour sweep on the label — no sliding
- * indicator, so the bar never needs to measure its own width.
+ * One tab. Active state is a soft pill behind the icon, a regular → fill icon cross-fade and a
+ * label colour change. The transition is a single restrained 180ms timing curve (applied
+ * immediately when reduced motion is on), never a spring-heavy slide.
  */
 function TabButton({ item, selected }: { item: TabItem; selected: boolean }) {
   const { theme } = usePolyClawTheme();
@@ -46,23 +44,20 @@ function TabButton({ item, selected }: { item: TabItem; selected: boolean }) {
   const progress = useSharedValue(selected ? 1 : 0);
 
   useEffect(() => {
-    progress.value = reduce ? (selected ? 1 : 0) : withSpring(selected ? 1 : 0, motion.settle);
+    progress.value = withTiming(selected ? 1 : 0, { duration: reduce ? 0 : 180 });
   }, [progress, reduce, selected]);
 
   const pillStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    transform: [{ scale: reduce ? 1 : interpolate(progress.value, [0, 1], [0.7, 1], Extrapolation.CLAMP) }],
+    transform: [{ scale: reduce ? 1 : interpolate(progress.value, [0, 1], [0.94, 1], Extrapolation.CLAMP) }],
   }));
 
-  // Cross-fade the two icon weights instead of swapping them, so selection reads as a change of
-  // state rather than a hard cut.
   const outlineStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 1], [1, 0], Extrapolation.CLAMP),
   }));
 
   const filledStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    transform: [{ scale: reduce ? 1 : interpolate(progress.value, [0, 1], [0.86, 1.06], Extrapolation.CLAMP) }],
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
@@ -98,17 +93,13 @@ function TabButton({ item, selected }: { item: TabItem; selected: boolean }) {
 }
 
 /**
- * The single tab bar for both PolyClaw surfaces.
- *
- * A quiet floating bar: near-white panel, one hairline border, a shallow shadow, and no chrome
- * beyond the icon and label.
+ * The single tab bar for both PolyClaw surfaces. Flat panel, one hairline top border and a
+ * shallow shadow; bottom labels are retained for accessibility.
  */
 export function PolyClawTabBar({ items }: { items: readonly TabItem[] }) {
   const { theme } = usePolyClawTheme();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const reduce = useReducedMotion();
-  const glass = glassAvailable && theme.mode === 'dark' && !reduce;
 
   return (
     <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
@@ -125,7 +116,6 @@ export function PolyClawTabBar({ items }: { items: readonly TabItem[] }) {
             shadowRadius: theme.shadow.radius,
           },
         ]}>
-        {glass ? <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} tintColor={theme.accentSoft} /> : null}
         <View style={styles.row}>
           {items.map((item) => (
             <TabButton item={item} key={item.href} selected={isActive(item, pathname)} />
@@ -138,12 +128,12 @@ export function PolyClawTabBar({ items }: { items: readonly TabItem[] }) {
 
 const styles = StyleSheet.create({
   bar: {
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     minHeight: 64,
     overflow: 'hidden',
-    shadowOffset: { height: 10, width: 0 },
+    shadowOffset: { height: 6, width: 0 },
   },
   host: {
     bottom: 0,
@@ -186,9 +176,8 @@ const styles = StyleSheet.create({
   },
   tabInner: {
     alignItems: 'center',
-    gap: 1,
     justifyContent: 'center',
-    minHeight: 52,
-    minWidth: 48,
+    minHeight: 44,
+    minWidth: 44,
   },
 });

@@ -47,11 +47,24 @@ export async function logoutUser(session: AuthSession) {
 
 export type ConsumerProcedure = 'dashboard' | 'activate' | 'updateSettings' | 'pause' | 'resume' | 'portfolio' | 'footballMarkets' | 'quoteManualOrder' | 'submitManualOrder' | 'cancelManualOrder' | 'account' | 'walletIdentityToken' | 'provisionDepositWallet' | 'depositWalletStatus' | 'createDepositAddress' | 'depositStatus' | 'createWalletChallenge' | 'verifyWalletOwnership' | 'connectReadOnlyWallet' | 'beginDepositWallet' | 'updateBudgets' | 'submitLiveReview' | 'updateNotifications' | 'renewSigner' | 'authorizeBotSigner' | 'prepareLiveActivation' | 'enableLiveBot' | 'disableLiveBot' | 'revokeSigner' | 'revokeBotSigner' | 'prepareClosePosition' | 'closePositionStatus' | 'prepareOwnerAction' | 'submitOwnerAction' | 'ownerActionStatus' | 'prepareWithdrawal' | 'disconnectWallet' | 'requestOffboarding' | 'pilotGrantStatus' | 'requestPilotAccess' | 'grantPilotAccess' | 'revokePilotAccess' | 'pilotAccessRequestQueue' | 'searchPilotUsers' | 'pilotMemberships' | 'pilotMembershipAudit' | 'addPilotMembership' | 'revokePilotMembership' | 'liveReviewQueue' | 'approveLiveAccount' | 'denyLiveAccount' | 'revokeLiveAccount' | 'prepareCancellationPreflight' | 'cancellationPreflightStatus' | 'canaryIntentQueue' | 'releaseCanaryIntent' | 'resetCanaryAttempt';
 
-const consumerQueries = new Set<ConsumerProcedure>(['dashboard', 'portfolio', 'footballMarkets', 'account', 'depositWalletStatus', 'depositStatus', 'pilotGrantStatus', 'pilotAccessRequestQueue', 'searchPilotUsers', 'pilotMemberships', 'pilotMembershipAudit', 'ownerActionStatus', 'closePositionStatus', 'liveReviewQueue', 'cancellationPreflightStatus', 'canaryIntentQueue']);
+/** Admin-directed auto-trading consumer procedures. */
+export type ConsumerAutoTradeProcedure = 'homeStatus' | 'copyConsent' | 'acceptCopyConsent' | 'configureAutoTradeLimits' | 'enableAutoTrade' | 'pauseAutoTrade' | 'resumeAutoTrade' | 'autoTradeTrades' | 'autoTradeTrade' | 'closeAutoTradePosition' | 'autoTradeWalletReadiness';
 
-export async function consumerRequest<T>(accessToken: string, procedure: ConsumerProcedure, input?: Record<string, unknown>): Promise<T> {
+const consumerQueries = new Set<ConsumerProcedure | ConsumerAutoTradeProcedure>(['dashboard', 'portfolio', 'footballMarkets', 'account', 'depositWalletStatus', 'depositStatus', 'pilotGrantStatus', 'pilotAccessRequestQueue', 'searchPilotUsers', 'pilotMemberships', 'pilotMembershipAudit', 'ownerActionStatus', 'closePositionStatus', 'liveReviewQueue', 'cancellationPreflightStatus', 'canaryIntentQueue', 'homeStatus', 'copyConsent', 'autoTradeTrades', 'autoTradeTrade', 'autoTradeWalletReadiness']);
+
+export async function consumerRequest<T>(accessToken: string, procedure: ConsumerProcedure | ConsumerAutoTradeProcedure, input?: Record<string, unknown>): Promise<T> {
   const endpoint = client(accessToken).polyClawConsumer[procedure];
   return (consumerQueries.has(procedure) ? endpoint.query(input) : endpoint.mutate(input ?? {})) as Promise<T>;
+}
+
+/** Admin-directed auto-trading operator procedures (`polyClawAdmin` router). */
+export type AdminProcedure = 'catalogueSearch' | 'listBatches' | 'getBatch' | 'createDraft' | 'addSignal' | 'updateSignal' | 'removeSignal' | 'discardDraft' | 'validateBatch' | 'publishBatch' | 'cancelBatch' | 'deliverySummary' | 'listDeliveries' | 'dispatchBatch' | 'dispatchDelivery' | 'expireStaleSignals' | 'eligibilityDirectory' | 'publisherStatus' | 'listPublishers' | 'publisherAudit' | 'grantPublisher' | 'revokePublisher' | 'platformControl' | 'updatePlatformControl' | 'setGlobalPause' | 'connections';
+
+const adminQueries = new Set<AdminProcedure>(['catalogueSearch', 'listBatches', 'getBatch', 'validateBatch', 'deliverySummary', 'listDeliveries', 'eligibilityDirectory', 'publisherStatus', 'listPublishers', 'publisherAudit', 'platformControl', 'connections']);
+
+export async function adminRequest<T>(accessToken: string, procedure: AdminProcedure, input?: Record<string, unknown>): Promise<T> {
+  const endpoint = client(accessToken).polyClawAdmin[procedure];
+  return (adminQueries.has(procedure) ? endpoint.query(input) : endpoint.mutate(input ?? {})) as Promise<T>;
 }
 
 export async function registerPushToken(accessToken: string, expoPushToken: string) {

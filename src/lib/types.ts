@@ -293,3 +293,77 @@ export type ModelMarketActivation = {
     policyRoi: number | null;
   } | null;
 };
+
+// ─── PolyClaw admin-directed auto-trading ──────────────────────
+
+export type PolyClawPrimaryAction = 'SET_UP' | 'ENABLE' | 'PAUSE' | 'FUND' | 'NONE';
+
+export type ConsumerReadinessBlocker = { code: string; label: string; cta: PolyClawPrimaryAction };
+
+export type ConsumerHomeStatus = {
+  ready: boolean;
+  enabled: boolean;
+  primaryAction: PolyClawPrimaryAction;
+  blockers: ConsumerReadinessBlocker[];
+  wallet: { status: string; availablePusd: number; depositWalletAddress: string | null };
+  limits: { perTradeUsdc: number; dailyUsdc: number; dailyUsedUsdc: number; dailyRemainingUsdc: number; approvedStakePreviewUsdc: number };
+  openTrades: number;
+  today: { id: string; eventTitle: string; selectionLabel: string; status: string; stakeUsdc: number; createdAt: string }[];
+  consent: { currentVersion: number; acceptedVersion: number | null; fresh: boolean };
+};
+
+export type ConsumerCopyConsent = { currentVersion: number; acceptedVersion: number | null; acceptedAt: string | null; fresh: boolean };
+
+export type ConsumerAutoTradeRow = {
+  id: string; signalId: string; eventTitle: string; marketLabel: string; selectionLabel: string;
+  kickoff: string; maxPrice: number; stakeUsdc: number; filledUsdc: number; status: string;
+  failureReason: string | null; note: string | null; positionId: string | null; createdAt: string;
+};
+
+export type ConsumerAutoTradeDetail = ConsumerAutoTradeRow & {
+  expiresAt: string;
+  timeline: { at: string; label: string }[];
+  fills: { shares: number; price: number; feeUsdc: number; occurredAt: string }[];
+  canClose: boolean;
+};
+
+export type AdminSignalBatch = {
+  id: string; status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED'; title: string | null; note: string | null;
+  createdBy: string; publishedBy: string | null; publishedAt: string | null; cancelledAt: string | null;
+  cancelReason: string | null; expiresAt: string | null; signalCount: number; createdAt: string; updatedAt: string;
+};
+
+export type AdminSignalRow = {
+  id: string; batchId: string; ordinal: number; eventId: string; marketId: string; conditionId: string;
+  outcomeTokenId: string; side: 'BUY'; eventTitle: string; marketLabel: string; selectionLabel: string;
+  competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null;
+  kickoff: string; maxPrice: number; expiresAt: string; note: string | null; status: string;
+};
+
+export type AdminSignalValidation = { ordinal: number; valid: boolean; errors: string[]; market: boolean; acceptance: boolean; liquidityUsdc: number | null; bestAsk: number | null; verifiedAt: string | null };
+
+export type AdminDeliveryRow = {
+  id: string; batchId: string; signalId: string; userId: string; email: string; eventTitle: string;
+  marketLabel: string; selectionLabel: string; kickoff: string; approvedStakeUsdc: number; reservedUsdc: number;
+  status: string; failureCode: string | null; failureReason: string | null; exchangeOrderId: string | null; createdAt: string;
+};
+
+export type AdminEligibilityRow = {
+  userId: string; email: string; name: string | null; isActive: boolean; autoTradeEnabled: boolean;
+  consentVersion: number | null; perTradeUsdc: number; dailyUsdc: number; eligible: boolean;
+  blockingCode: string | null; blockingReason: string | null;
+};
+
+export type AdminPlatformControl = {
+  maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number; globallyPaused: boolean;
+  pauseReason: string | null; pausedAt: string | null; pausedBy: string | null; updatedBy: string | null; updatedAt: string;
+  hardCaps: { maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number };
+  defaults: { maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number };
+};
+
+export type AdminConnections = {
+  adminSignalsEnabled: boolean; liveTransportEnabled: boolean; supportedJurisdictions: string[];
+  executionChannelConfigured: boolean; globallyPaused: boolean;
+};
+
+export type AdminPublisher = { userId: string; email: string; name: string | null; status: string; grantedBy: string; grantReason: string; grantedAt: string };

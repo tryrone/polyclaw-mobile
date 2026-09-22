@@ -3,69 +3,80 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useColorScheme } from 'react-native';
 
 /**
- * Palette derived from the Finora reference: a light, low-contrast, soft-glass surface language.
+ * Ink-first, warm-neutral foundation; the supplied Minimal Apps reference informs the
+ * hierarchy and restraint, not the exact assets.
  *
- * One restrained violet-blue accent, near-black ink, and semantic colour reserved for state.
- * Chart hues (rose, green, amber) appear only inside data visualisation, never as decoration.
- * The dark palette is a calm counterpart for the Appearance toggle, not a second identity.
+ * Violet is limited to active navigation, focus, selection and small brand cues. Green,
+ * amber and red are semantic states only and are always paired with text or an icon.
+ * Decorative gradients, lavender glows and default glass surfaces are removed.
  */
 const light = {
   mode: 'light' as const,
-  background: '#F3F3F7',
-  backgroundGlow: '#E7E3F4',
+  /** App background: warm near-white. */
+  background: '#F7F7F4',
+  /** Retained for compatibility; no decorative glow is rendered from this token. */
+  backgroundGlow: '#F7F7F4',
+  /** Primary surface. */
   panel: '#FFFFFF',
-  panelRaised: '#FCFCFE',
-  field: '#EFEFF4',
-  border: '#E3E3EA',
-  borderStrong: '#C9C9D6',
-  text: '#0C0D12',
-  textSoft: '#3B3D45',
-  textMuted: '#71737C',
+  /** Flat group surface; shadows are reserved for hero panels and sheets. */
+  panelRaised: '#FFFFFF',
+  /** Secondary field / group surface. */
+  field: '#F0F0EC',
+  /** Hairline separators. */
+  border: '#D9D9D4',
+  borderStrong: '#C4C4BE',
+  /** Primary ink and primary actions. */
+  text: '#111111',
+  textSoft: '#3A3A36',
+  /** Secondary text. */
+  textMuted: '#66645F',
   accent: '#625BD8',
   accentStrong: '#4F48C8',
   accentInk: '#FFFFFF',
   accentSoft: 'rgba(98,91,216,0.10)',
-  accentGradient: ['#8F89EC', '#625BD8'] as [string, string],
-  success: '#1F8A4C',
-  successSoft: 'rgba(31,138,76,0.10)',
-  warning: '#A9690A',
-  warningSoft: 'rgba(169,105,10,0.10)',
-  danger: '#C2415A',
-  dangerSoft: 'rgba(194,65,90,0.10)',
-  greySoft: 'rgba(12,13,18,0.05)',
-  overlay: 'rgba(12,13,18,0.40)',
-  shadow: { color: '#2A2440', opacity: 0.08, radius: 20, elevation: 4 },
+  /** Neutralised: primary CTAs render as flat ink, not decorative violet gradients. */
+  accentGradient: ['#111111', '#111111'] as [string, string],
+  success: '#1F7A45',
+  successSoft: 'rgba(31,122,69,0.10)',
+  warning: '#8A5A00',
+  warningSoft: 'rgba(138,90,0,0.10)',
+  danger: '#B23A48',
+  dangerSoft: 'rgba(178,58,72,0.10)',
+  greySoft: 'rgba(17,17,17,0.05)',
+  overlay: 'rgba(17,17,17,0.40)',
+  shadow: { color: '#111111', opacity: 0.05, radius: 12, elevation: 1 },
 };
 
 export type Theme = Omit<typeof light, 'mode'> & { mode: 'light' | 'dark' };
 
+/** System dark appearance, not a second identity. */
 const dark: Theme = {
   ...light,
   mode: 'dark',
-  background: '#101014',
-  backgroundGlow: '#232036',
-  panel: '#17171D',
-  panelRaised: '#1D1D25',
-  field: '#22222B',
-  border: '#2E2E39',
-  borderStrong: '#43434F',
-  text: '#F6F6F8',
-  textSoft: '#CFCFD8',
-  textMuted: '#8E8F9A',
+  background: '#0E0E0F',
+  backgroundGlow: '#0E0E0F',
+  panel: '#17171A',
+  panelRaised: '#1D1D21',
+  field: '#232327',
+  border: '#2E2E33',
+  borderStrong: '#43434A',
+  text: '#F4F4F2',
+  textSoft: '#C9C9C4',
+  textMuted: '#8A8A85',
   accent: '#8B84F0',
   accentStrong: '#A29BF6',
-  accentInk: '#12121A',
+  accentInk: '#121214',
   accentSoft: 'rgba(139,132,240,0.16)',
-  accentGradient: ['#6C64E0', '#A79FF5'] as [string, string],
-  success: '#3DD68C',
-  successSoft: 'rgba(61,214,140,0.14)',
-  warning: '#F0B429',
-  warningSoft: 'rgba(240,180,41,0.14)',
-  danger: '#F0738C',
-  dangerSoft: 'rgba(240,115,140,0.14)',
-  greySoft: 'rgba(246,246,248,0.08)',
-  overlay: 'rgba(6,6,10,0.62)',
-  shadow: { color: '#050409', opacity: 0.5, radius: 18, elevation: 10 },
+  accentGradient: ['#3A3A40', '#2A2A30'] as [string, string],
+  success: '#4FCB8B',
+  successSoft: 'rgba(79,203,139,0.14)',
+  warning: '#E8B049',
+  warningSoft: 'rgba(232,176,73,0.14)',
+  danger: '#F07A88',
+  dangerSoft: 'rgba(240,122,136,0.14)',
+  greySoft: 'rgba(244,244,242,0.07)',
+  overlay: 'rgba(8,8,8,0.62)',
+  shadow: { color: '#000000', opacity: 0.4, radius: 12, elevation: 6 },
 };
 
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -77,15 +88,11 @@ type ThemeValue = {
 };
 
 const Context = createContext<ThemeValue | null>(null);
-/**
- * Bumped when the shipped default flips from dark to light, so a previously persisted default
- * cannot silently override the new one. An explicit user choice made after this point still wins.
- */
-const STORAGE_KEY = 'polyclaw.theme.v2';
+const STORAGE_KEY = 'polyclaw.theme.v3';
 
 export function PolyClawThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme() === 'light' ? 'light' : 'dark';
-  const [preference, setPreferenceState] = useState<ThemePreference>('light');
+  const [preference, setPreferenceState] = useState<ThemePreference>('system');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((value) => {
@@ -108,13 +115,15 @@ export function usePolyClawTheme() {
   return value;
 }
 
+/** 4/8px spacing system with 16px screen gutters and 24–32px major separation. */
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+/** 16px standard radii; full pills and circles are reserved for compact controls and icons. */
 export const radius = { sm: 10, md: 16, lg: 24, pill: 999 } as const;
-export const layout = { phoneGutter: 8, largeScreenGutter: 16, onboardingGutter: 16, controlRadius: 16, largeScreenBreakpoint: 768 } as const;
+export const layout = { phoneGutter: 16, largeScreenGutter: 16, onboardingGutter: 16, controlRadius: 16, largeScreenBreakpoint: 768 } as const;
+
 export const fonts = {
-  display: 'Manrope_700Bold',
-  displayExtraBold: 'Manrope_800ExtraBold',
-  /** Oversized light-weight secondary headline, matching the reference's bold + light pairing. */
+  display: 'Manrope_600SemiBold',
+  displayExtraBold: 'Manrope_700Bold',
   displayLight: 'Manrope_300Light',
   regular: 'Manrope_400Regular',
   medium: 'Manrope_500Medium',
@@ -122,10 +131,15 @@ export const fonts = {
   bold: 'Manrope_700Bold',
 } as const;
 
+/** Tabular numerals for balances, prices, limits, shares and P&L. */
+export const numeric = { fontVariant: ['tabular-nums'] as ('tabular-nums')[] };
+
+/** Restrained 140–220ms fades, opacity changes and small scale feedback. */
 export const motion = {
   press: { stiffness: 420, damping: 40, mass: 1 },
-  enter: { stiffness: 260, damping: 22, mass: 1 },
-  settle: { stiffness: 180, damping: 27, mass: 1 },
+  enter: { stiffness: 260, damping: 30, mass: 1 },
+  settle: { stiffness: 220, damping: 30, mass: 1 },
   fast: { duration: 140 },
-  base: { duration: 220 },
+  base: { duration: 200 },
+  slow: { duration: 220 },
 } as const;

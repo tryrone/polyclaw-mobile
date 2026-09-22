@@ -5,15 +5,12 @@ import { PolyClawTabBar, type TabItem } from '@/components/tab-bar';
 import { useAuth } from '@/auth/provider';
 
 /**
- * Consumer surface: three tabs.
- *
- * A consumer only needs to know what they have, what is invested, what their bot is doing, and
- * what the bot has traded. Portfolio and Bot are now detail screens reached from Home, so they
- * stay registered as routes but no longer occupy the bar.
+ * Consumer surface: exactly three labelled tabs — Home, Trades, Account. The standalone Bot,
+ * Portfolio, Activity, Wallet, Getting Started and Football Trade screens are removed.
  */
 const tabs: (TabItem & { name: string })[] = [
   { name: 'home', href: '/home', label: 'Home', Icon: House },
-  { name: 'trades', href: '/trades', label: 'Trades', Icon: Receipt, active: ['/activity'] },
+  { name: 'trades', href: '/trades', label: 'Trades', Icon: Receipt },
   { name: 'account', href: '/account', label: 'Account', Icon: UserCircle },
 ];
 
@@ -26,10 +23,6 @@ export default function ConsumerLayout() {
         {tabs.map(({ name }) => (
           <Tabs.Screen key={name} name={name} />
         ))}
-        <Tabs.Screen name="bot" options={{ href: null }} />
-        <Tabs.Screen name="portfolio" options={{ href: null }} />
-        <Tabs.Screen name="activity" options={{ href: null }} />
-        <Tabs.Screen name="wallet" options={{ href: null }} />
       </Tabs>
       <PolyClawTabBar items={tabs} />
     </>

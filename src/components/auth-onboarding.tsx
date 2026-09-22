@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { AppleLogo, Eye, EyeSlash } from 'phosphor-react-native';
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps } from 'react-native';
@@ -20,22 +19,6 @@ export function AuthScaffold({ children }: { children: ReactNode }) {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <LinearGradient
-        colors={theme.mode === 'dark'
-          ? ['rgba(37,99,235,0.66)', 'rgba(109,40,217,0.30)', 'rgba(8,6,15,0)']
-          : ['rgba(96,165,250,0.38)', 'rgba(167,139,250,0.22)', 'rgba(247,246,251,0)']}
-        end={{ x: 0.58, y: 1 }}
-        pointerEvents="none"
-        start={{ x: 0.5, y: 0 }}
-        style={styles.skyGlow}
-      />
-      <LinearGradient
-        colors={['rgba(34,211,238,0.20)', 'rgba(34,211,238,0)']}
-        end={{ x: 0.4, y: 1 }}
-        pointerEvents="none"
-        start={{ x: 0.5, y: 0 }}
-        style={styles.cyanGlow}
-      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardAvoider}>
         <ScrollView
           automaticallyAdjustKeyboardInsets
@@ -86,8 +69,8 @@ export function AuthCard({ children, title, detail }: { children: ReactNode; tit
       style={[
         styles.card,
         {
-          backgroundColor: theme.mode === 'dark' ? 'rgba(15,12,24,0.76)' : 'rgba(255,255,255,0.86)',
-          borderColor: theme.mode === 'dark' ? 'rgba(196,181,253,0.18)' : theme.border,
+          backgroundColor: theme.panel,
+          borderColor: theme.border,
           shadowColor: theme.shadow.color,
           shadowOpacity: theme.shadow.opacity,
         },
@@ -231,15 +214,9 @@ export function AuthPrimaryButton({ label, loading = false, ...props }: Pressabl
       accessibilityState={{ disabled: Boolean(inactive), busy: loading }}
       containerStyle={styles.primaryButtonContainer}
       disabled={inactive}
-      style={({ pressed }) => [styles.primaryButton, inactive && styles.disabled, pressed && styles.primaryButtonPressed]}>
-      <LinearGradient
-        colors={theme.accentGradient}
-        end={{ x: 1, y: 0.5 }}
-        start={{ x: 0, y: 0.5 }}
-        style={styles.primaryButtonFill}>
-        {loading ? <ActivityIndicator color="#07101D" size="small" /> : null}
-        <Text maxFontSizeMultiplier={1.4} style={styles.primaryButtonLabel}>{label}</Text>
-      </LinearGradient>
+      style={({ pressed }) => [styles.primaryButton, { backgroundColor: theme.text }, inactive && styles.disabled, pressed && styles.primaryButtonPressed]}>
+      {loading ? <ActivityIndicator color={theme.background} size="small" /> : null}
+      <Text maxFontSizeMultiplier={1.4} style={[styles.primaryButtonLabel, { color: theme.background }]}>{label}</Text>
     </PressableScale>
   );
 }
@@ -267,8 +244,6 @@ export function AuthSwitchLink({ prefix, action, accessibilityLabel, onPress }: 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, overflow: 'hidden' },
   keyboardAvoider: { flex: 1 },
-  skyGlow: { height: 440, left: -90, position: 'absolute', right: -90, top: -170 },
-  cyanGlow: { borderRadius: 180, height: 360, opacity: 0.76, position: 'absolute', right: -170, top: 40, width: 360 },
   scrollContent: { flexGrow: 1, paddingBottom: spacing.xl, paddingTop: spacing.lg },
   content: { alignSelf: 'center', gap: spacing.lg, maxWidth: 520, paddingHorizontal: layout.onboardingGutter, width: '100%' },
   brandLogoFrame: { alignItems: 'center', alignSelf: 'center', backgroundColor: '#08060F', borderColor: 'rgba(196,181,253,0.22)', borderRadius: 18, borderWidth: 1, height: 60, justifyContent: 'center', shadowColor: '#7C3AED', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.22, shadowRadius: 18, width: 60 },
@@ -299,9 +274,8 @@ const styles = StyleSheet.create({
   googleIcon: { height: 18, width: 18 },
   googleLabel: { fontFamily: fonts.medium, fontSize: 12.5 },
   primaryButtonContainer: { alignSelf: 'stretch', borderRadius: radius.pill, overflow: 'hidden' },
-  primaryButton: { borderRadius: radius.pill, minHeight: 50, overflow: 'hidden' },
-  primaryButtonFill: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', minHeight: 50, paddingHorizontal: spacing.lg },
-  primaryButtonLabel: { color: '#07101D', fontFamily: fonts.bold, fontSize: 13 },
+  primaryButton: { alignItems: 'center', borderRadius: radius.pill, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', minHeight: 50, overflow: 'hidden', paddingHorizontal: spacing.lg },
+  primaryButtonLabel: { fontFamily: fonts.bold, fontSize: 13 },
   primaryButtonPressed: { opacity: 0.9 },
   disabled: { opacity: 0.45 },
   switchLink: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', minHeight: 44 },

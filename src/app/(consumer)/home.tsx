@@ -1,171 +1,202 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowRight, Pause, Play, Robot } from 'phosphor-react-native';
+import { Check, Pause, Play, Wallet } from 'phosphor-react-native';
 import { useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { PerformanceChart } from '@/components/performance-chart';
-import { PressableScale } from '@/components/motion';
-import { ActionButton, Card, Header, Metric, money, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
+import { Disclosure } from '@/components/disclosure';
+import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
-import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { ConsumerPortfolio } from '@/lib/types';
-import { fonts, radius, spacing, usePolyClawTheme } from '@/theme';
+import type { ConsumerHomeStatus, PolyClawPrimaryAction } from '@/lib/types';
+import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 /**
- * Consumer Home answers exactly three questions: what do I have, what is invested, and what is my
- * bot doing. Trades live in their own tab; Portfolio holds the deeper performance record.
+ * Home leads with one dominant object: the Auto-trade / wallet hero. Below it are the current
+ * readiness or pause state, the daily amount used and remaining, exactly one primary action,
+ * and a short "Today" preview. No decorative gradients or metric walls.
  */
 export default function ConsumerHome() {
   const { theme } = usePolyClawTheme();
   const { consumer } = useAuth();
-  const resource = useConsumerDashboard();
-  const portfolio = useConsumerResource<ConsumerPortfolio>('portfolio', { range: '1W', source: 'COMBINED' }, 60_000);
+  const resource = useConsumerResource<ConsumerHomeStatus>('homeStatus', undefined, 20_000);
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [perTrade, setPerTrade] = useState('');
+  const [daily, setDaily] = useState('');
 
   const data = resource.data;
-  const setup = data?.profile.botState === 'SETUP';
-  const running = data?.profile.botState === 'ACTIVE';
 
-  const setBotRunning = async (next: 'pause' | 'resume') => {
+  const run = async (action: () => Promise<unknown>, note?: string) => {
     setBusy(true);
+    setMessage(null);
     try {
-      await consumer(next);
+      await action();
+      if (note) setMessage(note);
       await resource.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'That did not go through.');
     } finally {
       setBusy(false);
     }
   };
 
+  const onPrimary = () => {
+    if (!data) return;
+    const action: PolyClawPrimaryAction = data.primaryAction;
+    if (action === 'FUND' || action === 'NONE') { router.push('/account' as never); return; }
+    if (action === 'ENABLE') void run(() => consumer('enableAutoTrade'), 'Auto-trade enabled.');
+    if (action === 'PAUSE') void run(() => consumer('pauseAutoTrade', { reason: 'Paused by user' }), 'Auto-trade paused.');
+  };
+
+  const submitSetup = async () => {
+    const per = Number(perTrade);
+    const day = Number(daily);
+    if (!Number.isFinite(per) || !Number.isFinite(day) || per <= 0 || day <= 0) { setMessage('Enter a valid per-trade and daily amount.'); return; }
+    await run(async () => {
+      if (!data?.consent.fresh) await consumer('acceptCopyConsent', { version: data?.consent.currentVersion ?? 1, accepted: true });
+      await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
+    }, 'Limits saved. Tap Enable when you are ready.');
+  };
+
+  const heroState = !data ? 'SYNCING' : !data.ready ? 'SET_UP' : data.enabled ? 'ACTIVE' : 'PAUSED';
+  const heroTone = !data ? 'neutral' : !data.ready ? 'warning' : data.enabled ? 'success' : 'warning';
+  const primaryLabel = data?.primaryAction === 'ENABLE' ? 'Enable auto-trade'
+    : data?.primaryAction === 'PAUSE' ? 'Pause auto-trade'
+      : data?.primaryAction === 'FUND' ? 'Fund wallet'
+        : data?.primaryAction === 'NONE' ? 'View account'
+          : 'Set up auto-trade';
+  const PrimaryIcon = data?.primaryAction === 'PAUSE' ? Pause : data?.primaryAction === 'FUND' ? Wallet : data?.primaryAction === 'ENABLE' ? Play : Check;
+
   return (
-    <Screen
-      refreshControl={
-        <RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />
-      }>
-      <Header
-        action={
-          <StatusPill
-            label={data?.profile.botState ?? 'SYNCING'}
-            live={running}
-            tone={running ? 'success' : data?.profile.botState === 'PAUSED_SAFETY' ? 'danger' : 'warning'}
-          />
-        }
-        eyebrow="YOUR POLYCLAW"
-        title="Paper portfolio"
-      />
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
+      <Header action={<StatusPill label={heroState} live={heroState === 'ACTIVE'} tone={heroTone} />} title="Auto-trade" />
       <ResourceState error={resource.error} loading={resource.loading} />
 
-      {data ? (
-        <>
-          <LinearGradient
-            colors={[theme.panelRaised, theme.backgroundGlow]}
-            style={[styles.hero, { borderColor: theme.border }]}>
-            <Text style={[styles.label, { color: theme.textMuted }]}>SIMULATED EQUITY</Text>
-            <Text style={[styles.balance, { color: theme.text }]}>{money(data.summary.equityUsdc)}</Text>
-            <View style={styles.metrics}>
-              <Metric label="Available" value={money(data.summary.availableBalanceUsdc)} />
-              <Metric label="Invested" value={money(data.summary.openExposureUsdc)} />
-              <Metric
-                accent={data.summary.realizedPnlUsdc >= 0}
-                label="Realized P&L"
-                value={money(data.summary.realizedPnlUsdc)}
-              />
-            </View>
-          </LinearGradient>
+      <View style={[styles.hero, { backgroundColor: theme.text }]}>
+        <Text style={[styles.heroLabel, { color: theme.background }]}>TODAY REMAINING</Text>
+        <Text style={[styles.heroValue, { color: theme.background }]}>{money(data?.limits.dailyRemainingUsdc ?? 0)}</Text>
+        <Text style={[styles.heroCaption, { color: theme.background }]}>
+          {data ? `${money(data.limits.dailyUsedUsdc)} of ${money(data.limits.dailyUsdc)} used today` : 'Syncing your daily allowance'}
+        </Text>
+        <View style={styles.heroRow}>
+          <View style={styles.heroCell}>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>Per trade</Text>
+            <Text style={[styles.heroCellValue, { color: theme.background }]}>{money(data?.limits.perTradeUsdc ?? 0)}</Text>
+          </View>
+          <View style={styles.heroCell}>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>Open trades</Text>
+            <Text style={[styles.heroCellValue, { color: theme.background }]}>{data?.openTrades ?? 0}</Text>
+          </View>
+          <View style={styles.heroCell}>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>Wallet</Text>
+            <Text style={[styles.heroCellValue, { color: theme.background }]}>{money(data?.wallet.availablePusd ?? 0)}</Text>
+          </View>
+        </View>
+      </View>
 
-          <Card variant="raised">
-            <View style={styles.botRow}>
-              <View style={[styles.botIcon, { backgroundColor: theme.accentSoft }]}>
-                <Robot size={22} color={theme.accent} />
-              </View>
-              <View style={styles.flex}>
-                <Text style={[styles.heading, { color: theme.text }]}>
-                  {setup ? 'Your bot is ready to start' : running ? 'Your bot is trading' : 'Your bot is paused'}
-                </Text>
-                <Text style={[styles.copy, { color: theme.textMuted }]}>
-                  {setup
-                    ? 'Pick a risk level and a trade cap, then start paper trading.'
-                    : running
-                      ? 'Simulating eligible Polymarket decisions within your limits.'
-                      : 'New paper positions are paused until you resume.'}
-                </Text>
-              </View>
-              <PressableScale
-                accessibilityLabel="Open bot settings"
-                accessibilityRole="button"
-                haptic="select"
-                onPress={() => router.push('/bot' as never)}>
-                <View style={styles.manage}>
-                  <Text style={[styles.manageText, { color: theme.accent }]}>Manage</Text>
-                  <ArrowRight size={15} color={theme.accent} />
-                </View>
-              </PressableScale>
-            </View>
+      {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
 
-            {setup || !data.access.active ? (
-              <ActionButton
-                icon={ArrowRight as never}
-                label={data.access.active ? 'Set up my bot' : 'Restore access'}
-                onPress={() => router.push('/bot' as never)}
-              />
-            ) : running ? (
-              <ActionButton
-                icon={Pause as never}
-                label="Pause bot"
-                loading={busy}
-                onPress={() => void setBotRunning('pause')}
-                variant="secondary"
-              />
-            ) : (
-              <ActionButton
-                icon={Play as never}
-                label="Resume bot"
-                loading={busy}
-                onPress={() => void setBotRunning('resume')}
-                variant="secondary"
-              />
-            )}
-          </Card>
-
-          <Card>
-            <View style={styles.between}>
-              <View style={styles.flex}>
-                <Text style={[styles.heading, { color: theme.text }]}>7-day equity</Text>
-                <Text style={[styles.copy, { color: theme.textMuted }]}>
-                  Deposits and withdrawals are excluded from return.
-                </Text>
-              </View>
-              <PressableScale
-                accessibilityLabel="Open full performance record"
-                accessibilityRole="button"
-                haptic="select"
-                onPress={() => router.push('/portfolio' as never)}>
-                <View style={styles.manage}>
-                  <Text style={[styles.manageText, { color: theme.accent }]}>View all</Text>
-                  <ArrowRight size={15} color={theme.accent} />
-                </View>
-              </PressableScale>
-            </View>
-            <PerformanceChart series={portfolio.data?.series ?? []} />
-          </Card>
-        </>
+      {data && !data.ready && data.blockers.length ? (
+        <Card>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Before you start</Text>
+          {data.blockers.slice(0, 4).map((blocker) => (
+            <Text key={blocker.code} style={[styles.blocker, { color: theme.textMuted }]}>· {blocker.label}</Text>
+          ))}
+        </Card>
       ) : null}
+
+      {data && data.primaryAction === 'SET_UP' ? (
+        <Card>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Set your limits</Text>
+          <Text style={[styles.copy, { color: theme.textMuted }]}>
+            Each published signal places at most your per-trade amount, capped by the platform and your remaining day.
+          </Text>
+          <View style={styles.fieldRow}>
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Per trade (USDC)</Text>
+              <TextInput
+                accessibilityLabel="Per trade amount in USDC"
+                keyboardType="decimal-pad"
+                onChangeText={setPerTrade}
+                placeholder="5"
+                placeholderTextColor={theme.textMuted}
+                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
+                value={perTrade}
+              />
+            </View>
+            <View style={styles.field}>
+              <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Per day (USDC)</Text>
+              <TextInput
+                accessibilityLabel="Daily amount in USDC"
+                keyboardType="decimal-pad"
+                onChangeText={setDaily}
+                placeholder="15"
+                placeholderTextColor={theme.textMuted}
+                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
+                value={daily}
+              />
+            </View>
+          </View>
+          <Disclosure detail="Copy trading lets PolyClaw place the publisher's signal on your wallet within your limits. You can pause any time and close individual positions yourself." label="What am I agreeing to?">
+            <Text style={[styles.copy, { color: theme.textMuted }]}>
+              Signals are pre-match football limit orders. Published terms are fixed and expire at kickoff at the latest.
+            </Text>
+          </Disclosure>
+          <ActionButton icon={Check as never} label="Save limits" loading={busy} onPress={() => void submitSetup()} />
+        </Card>
+      ) : null}
+
+      <ActionButton
+        disabled={data?.primaryAction === 'NONE'}
+        icon={PrimaryIcon as never}
+        label={primaryLabel}
+        loading={busy}
+        onPress={onPrimary}
+      />
+
+      <View style={styles.previewHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Today</Text>
+        <Text style={[styles.previewMeta, { color: theme.textMuted }]}>{data?.today.length ?? 0} updates</Text>
+      </View>
+      {data?.today.length ? (
+        data.today.map((row) => (
+          <View key={row.id} style={[styles.previewRow, { borderBottomColor: theme.border }]}>
+            <View style={styles.flex}>
+              <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.text }]}>{row.eventTitle}</Text>
+              <Text numberOfLines={1} style={[styles.previewSub, { color: theme.textMuted }]}>{row.selectionLabel} · {row.status}</Text>
+            </View>
+            <Text style={[styles.previewValue, { color: theme.text }]}>{money(row.stakeUsdc)}</Text>
+          </View>
+        ))
+      ) : (
+        <Text style={[styles.copy, { color: theme.textMuted }]}>No fills or skips yet today.</Text>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  balance: { fontFamily: fonts.displayExtraBold, fontSize: 44, letterSpacing: -1.6, marginTop: 6 },
-  between: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  botIcon: { alignItems: 'center', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
-  botRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: spacing.lg },
-  copy: { fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 18, marginTop: 3 },
+  blocker: { fontFamily: fonts.regular, fontSize: 13.5, lineHeight: 20, marginTop: 6 },
+  copy: { fontFamily: fonts.regular, fontSize: 13.5, lineHeight: 20, marginTop: 6 },
+  field: { flex: 1, gap: 6 },
+  fieldLabel: { fontFamily: fonts.semibold, fontSize: 11.5 },
+  fieldRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
   flex: { flex: 1, minWidth: 0 },
-  heading: { fontFamily: fonts.display, fontSize: 16 },
-  hero: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, gap: spacing.md, padding: spacing.xl },
-  label: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1.4 },
-  manage: { alignItems: 'center', flexDirection: 'row', gap: 4, minHeight: 44 },
-  manageText: { fontFamily: fonts.bold, fontSize: 12.5 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
+  hero: { borderRadius: radius.md, gap: 2, padding: spacing.xl },
+  heroCaption: { fontFamily: fonts.regular, fontSize: 13, opacity: 0.7 },
+  heroCell: { flex: 1 },
+  heroCellLabel: { fontFamily: fonts.medium, fontSize: 11, opacity: 0.6 },
+  heroCellValue: { fontFamily: fonts.semibold, fontSize: 15, marginTop: 2, ...numeric },
+  heroLabel: { fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1.2, opacity: 0.6 },
+  heroRow: { flexDirection: 'row', marginTop: spacing.lg },
+  heroValue: { fontFamily: fonts.displayLight, fontSize: 44, letterSpacing: -1.2, ...numeric },
+  input: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.semibold, fontSize: 15, minHeight: 44, paddingHorizontal: spacing.md },
+  message: { fontFamily: fonts.medium, fontSize: 12.5 },
+  previewHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+  previewMeta: { fontFamily: fonts.medium, fontSize: 11.5 },
+  previewRow: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 52 },
+  previewSub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
+  previewTitle: { fontFamily: fonts.semibold, fontSize: 14 },
+  previewValue: { fontFamily: fonts.bold, fontSize: 14, ...numeric },
+  sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 },
 });

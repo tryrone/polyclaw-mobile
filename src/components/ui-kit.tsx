@@ -79,8 +79,8 @@ type ActionVariant = 'primary' | 'secondary' | 'danger';
 export function ActionButton({ label, icon: Icon, variant = 'primary', loading = false, haptic = 'tap', ...props }: PressableProps & { label: string; icon?: LucideIcon; variant?: ActionVariant; loading?: boolean; haptic?: keyof typeof haptics | null }) {
   const { theme } = usePolyClawTheme();
   const muted = props.disabled && !loading;
-  const backgroundColor = muted ? theme.field : variant === 'primary' ? theme.accentStrong : variant === 'danger' ? theme.dangerSoft : theme.field;
-  const color = muted ? theme.textMuted : variant === 'primary' ? theme.accentInk : variant === 'danger' ? theme.danger : theme.text;
+  const backgroundColor = muted ? theme.field : variant === 'primary' ? theme.text : variant === 'danger' ? theme.dangerSoft : theme.field;
+  const color = muted ? theme.textMuted : variant === 'primary' ? theme.background : variant === 'danger' ? theme.danger : theme.text;
   const inactive = props.disabled || loading;
   return (
     <PressableScale {...props} accessibilityRole="button" accessibilityState={{ ...props.accessibilityState, disabled: Boolean(inactive), busy: loading }} disabled={inactive} haptic={haptic} containerStyle={{ alignSelf: 'stretch' }} style={({ pressed }) => [styles.button, { backgroundColor, borderColor: muted || variant === 'secondary' ? theme.border : backgroundColor }, pressed && { opacity: 0.8 }]}>

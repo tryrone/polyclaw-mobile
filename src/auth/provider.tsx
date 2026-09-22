@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { AppState, type AppStateStatus } from 'react-native';
-import { consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser, type ConsumerProcedure } from '@/lib/api';
+import { adminRequest, consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser, type AdminProcedure, type ConsumerAutoTradeProcedure, type ConsumerProcedure } from '@/lib/api';
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import { signInWithGoogle as googleSignIn } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
@@ -27,7 +27,8 @@ type AuthValue = {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   request: <T>(path: string, init?: { method?: 'POST'; body?: Record<string, unknown>; idempotencyKey?: string }) => Promise<OperatorEnvelope<T>>;
-  consumer: <T>(procedure: ConsumerProcedure, input?: Record<string, unknown>) => Promise<T>;
+  consumer: <T>(procedure: ConsumerProcedure | ConsumerAutoTradeProcedure, input?: Record<string, unknown>) => Promise<T>;
+  admin: <T>(procedure: AdminProcedure, input?: Record<string, unknown>) => Promise<T>;
 };
 
 const Context = createContext<AuthValue | null>(null);
@@ -138,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return next;
   }, [save, session]);
 
-  const consumer = useCallback(async <T,>(procedure: ConsumerProcedure, input?: Record<string, unknown>) => {
-    if (recoveryMode && recoveryBlocksProcedure(procedure)) throw new Error('Re-enroll and complete biometric authentication before this security-sensitive action.');
+  const consumer = useCallback(async <T,>(procedure: ConsumerProcedure | ConsumerAutoTradeProcedure, input?: Record<string, unknown>) => {
+    if (recoveryMode && recoveryBlocksProcedure(procedure as ConsumerProcedure)) throw new Error('Re-enroll and complete biometric authentication before this security-sensitive action.');
     const active = await freshSession();
     try { return await consumerRequest<T>(active.accessToken, procedure, input); }
     catch (error) {
@@ -149,6 +150,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return consumerRequest<T>(next.accessToken, procedure, input);
     }
   }, [freshSession, recoveryMode, save]);
+
+  const admin = useCallback(async <T,>(procedure: AdminProcedure, input?: Record<string, unknown>) => {
+    const active = await freshSession();
+    try { return await adminRequest<T>(active.accessToken, procedure, input); }
+    catch (error) {
+      if ((error as Error & { data?: { httpStatus?: number } }).data?.httpStatus !== 401) throw error;
+      const next = await refreshUser(active.refreshToken);
+      await save(next);
+      return adminRequest<T>(next.accessToken, procedure, input);
+    }
+  }, [freshSession, save]);
 
   const request = useCallback(async <T,>(path: string, init?: { method?: 'POST'; body?: Record<string, unknown>; idempotencyKey?: string }) => {
     const active = await freshSession();
@@ -167,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [freshSession, save]);
 
-  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer }), [state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer]);
+  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin }), [state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

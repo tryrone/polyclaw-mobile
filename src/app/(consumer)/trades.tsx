@@ -1,132 +1,72 @@
-import { useMemo, useState } from 'react';
+import { SoccerBall } from 'phosphor-react-native';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { Disclosure } from '@/components/disclosure';
+import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
-import { Card, EmptyState, Header, money, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
-import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import { decimalOdds, isDoubleChance, marketLabel } from '@/lib/markets';
-import { features } from '@/lib/features';
-import type { ConsumerPortfolio } from '@/lib/types';
-import { fonts, radius, spacing, usePolyClawTheme } from '@/theme';
+import type { ConsumerAutoTradeDetail, ConsumerAutoTradeRow } from '@/lib/types';
+import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
+type Lens = 'pending' | 'open' | 'closed';
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
 
-type Row = {
-  detail: string;
-  facts: [string, string][];
-  figure: string;
-  fixture: string;
-  id: string;
-  open: boolean;
-  status: string;
-  tone: Tone;
-};
-
-type Lens = 'all' | 'open' | 'settled';
-
 const lenses: { label: string; value: Lens }[] = [
-  { label: 'All', value: 'all' },
+  { label: 'Pending', value: 'pending' },
   { label: 'Open', value: 'open' },
-  { label: 'Closed', value: 'settled' },
+  { label: 'Closed', value: 'closed' },
 ];
 
-function positionTone(status: string): Tone {
-  if (status === 'SETTLED') return 'success';
-  if (status === 'SKIPPED') return 'warning';
+function toneFor(status: string): Tone {
+  if (['FILLED', 'SETTLED'].includes(status)) return 'success';
+  if (['PENDING', 'RESERVED', 'DISPATCHED'].includes(status)) return 'warning';
+  if (['FAILED', 'SKIPPED', 'CANCELLED'].includes(status)) return 'danger';
   return 'neutral';
 }
 
 /**
- * Trades is the single ledger for the consumer surface.
- *
- * It replaces both the old Activity tab and the Portfolio positions/manual lenses: every bot
- * decision, open position and manual order appears in one list, and tapping a row reveals its
- * detail in place instead of pushing another screen.
+ * Trades is one ledger with Pending / Open / Closed filters on a single surface. Rows stay
+ * quiet: a circular market icon, game/market label, one status line, and the right-aligned
+ * stake or outcome. Tapping a row opens the trade detail in place.
  */
 export default function ConsumerTradesScreen() {
   const { theme } = usePolyClawTheme();
   const { consumer } = useAuth();
-  const dashboard = useConsumerDashboard();
-  const portfolio = useConsumerResource<ConsumerPortfolio>('portfolio', { range: '1M', source: 'COMBINED' }, 30_000);
-  const [lens, setLens] = useState<Lens>('all');
+  const [lens, setLens] = useState<Lens>('pending');
+  const resource = useConsumerResource<ConsumerAutoTradeRow[]>('autoTradeTrades', { filter: lens }, 20_000);
+  const [detail, setDetail] = useState<ConsumerAutoTradeDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const rows = useMemo<Row[]>(() => {
-    const list: Row[] = [];
+  const rows = useMemo(() => resource.data ?? [], [resource.data]);
 
-    for (const position of dashboard.data?.positions ?? []) {
-      const doubleChance = isDoubleChance(position.market);
-      list.push({
-        detail: `${marketLabel(position.market)} · ${doubleChance ? `${decimalOdds(position.entryPrice)} odds` : position.selectionLabel}`,
-        facts: [
-          ['Model probability', `${(position.probability * 100).toFixed(1)}%`],
-          ['Stake', money(position.plannedStakeUsdc)],
-          ...(position.realizedPnlUsdc != null ? ([['Result', money(position.realizedPnlUsdc)]] as [string, string][]) : []),
-          ...(position.rejectionReasons?.length ? ([['Skipped because', position.rejectionReasons.join(' · ')]] as [string, string][]) : []),
-        ],
-        figure:
-          position.realizedPnlUsdc != null
-            ? `${position.realizedPnlUsdc >= 0 ? '+' : ''}${money(position.realizedPnlUsdc)}`
-            : money(position.plannedStakeUsdc),
-        fixture: position.fixtureLabel,
-        id: `decision-${position.id}`,
-        open: position.status !== 'SETTLED' && position.status !== 'SKIPPED',
-        status: position.status,
-        tone: positionTone(position.status),
-      });
+  const openDetail = useCallback(async (id: string) => {
+    if (detail?.id === id) { setDetail(null); return; }
+    setDetailError(null);
+    try {
+      setDetail(await consumer<ConsumerAutoTradeDetail>('autoTradeTrade', { deliveryId: id }));
+    } catch (error) {
+      setDetailError(error instanceof Error ? error.message : 'Could not load this trade.');
     }
+  }, [consumer, detail?.id]);
 
-    for (const position of portfolio.data?.livePositions ?? []) {
-      list.push({
-        detail: `${position.marketLabel} · ${position.selectionLabel}`,
-        facts: [
-          ['Shares', Number(position.positionShares).toFixed(4)],
-          ['Current value', money(Number(position.currentValueUsdc))],
-        ],
-        figure: money(Number(position.currentValueUsdc)),
-        fixture: position.fixtureLabel,
-        id: `position-${position.id}`,
-        open: true,
-        status: position.status,
-        tone: 'warning',
-      });
+  const closePosition = async () => {
+    if (!detail) return;
+    setBusy(true);
+    try {
+      await consumer('closeAutoTradePosition', { deliveryId: detail.id });
+      setDetail(null);
+      await resource.refresh();
+    } finally {
+      setBusy(false);
     }
-
-    for (const order of portfolio.data?.manualOrders ?? []) {
-      const rejected = order.status.includes('REJECT') || order.status === 'EXPIRED';
-      list.push({
-        detail: `${order.marketLabel} · ${order.selectionLabel}`,
-        facts: [
-          ['Approved stake', money(order.approvedStakeUsdc)],
-          ['Limit price', `${(order.limitPrice * 100).toFixed(1)}¢`],
-          ['Maximum loss', money(order.maximumLossUsdc)],
-        ],
-        figure: money(order.approvedStakeUsdc),
-        fixture: order.fixtureLabel,
-        id: `order-${order.id}`,
-        open: ['QUOTED', 'PAPER_OPEN', 'OPEN', 'PARTIAL'].includes(order.status),
-        status: order.status,
-        tone: rejected ? 'danger' : order.status === 'SETTLED' ? 'success' : 'neutral',
-      });
-    }
-
-    return list;
-  }, [dashboard.data?.positions, portfolio.data?.livePositions, portfolio.data?.manualOrders]);
-
-  const visible = rows.filter((row) => (lens === 'all' ? true : lens === 'open' ? row.open : !row.open));
-  const refreshing = dashboard.loading || portfolio.loading;
-
-  const refresh = () => {
-    void dashboard.refresh();
-    void portfolio.refresh();
   };
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.accent} />}>
-      <Header eyebrow="EVERY DECISION AND ORDER" title="Trades" />
-      <ResourceState error={dashboard.error ?? portfolio.error} loading={refreshing && !rows.length} />
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
+      <Header title="Trades" />
+      <ResourceState error={resource.error} loading={resource.loading && !rows.length} />
 
       <View style={styles.lensRow}>
         {lenses.map((item) => {
@@ -136,92 +76,117 @@ export default function ConsumerTradesScreen() {
               accessibilityLabel={item.label}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
+              containerStyle={styles.flex}
               haptic="select"
               key={item.value}
-              onPress={() => setLens(item.value)}
-              containerStyle={styles.flex}>
-              <View
-                style={[
-                  styles.lens,
-                  {
-                    backgroundColor: active ? theme.accent : theme.panel,
-                    borderColor: active ? theme.accent : theme.border,
-                  },
-                ]}>
-                <Text style={[styles.lensText, { color: active ? theme.accentInk : theme.textMuted }]}>{item.label}</Text>
+              onPress={() => { setLens(item.value); setDetail(null); }}>
+              <View style={[styles.lens, { backgroundColor: active ? theme.text : theme.field, borderColor: active ? theme.text : theme.border }]}>
+                <Text style={[styles.lensText, { color: active ? theme.background : theme.textMuted }]}>{item.label}</Text>
               </View>
             </PressableScale>
           );
         })}
       </View>
 
-      {visible.length ? (
-        visible.map((row) => (
-          <Card key={row.id}>
-            <View style={styles.rowTop}>
-              <View style={styles.flex}>
-                <Text numberOfLines={1} style={[styles.fixture, { color: theme.text }]}>
-                  {row.fixture}
-                </Text>
-                <Text numberOfLines={1} style={[styles.detail, { color: theme.textMuted }]}>
-                  {row.detail}
-                </Text>
-              </View>
-              <View style={styles.right}>
-                <Text style={[styles.figure, { color: theme.text }]}>{row.figure}</Text>
-                <StatusPill label={row.status} tone={row.tone} />
-              </View>
-            </View>
-            <Disclosure detail="Recorded detail" label="Details">
-              {row.facts.map(([label, value]) => (
-                <View key={label} style={[styles.fact, { borderBottomColor: theme.border }]}>
-                  <Text style={[styles.factLabel, { color: theme.textMuted }]}>{label}</Text>
-                  <Text style={[styles.factValue, { color: theme.text }]}>{value}</Text>
+      {rows.length ? (
+        rows.map((row) => (
+          <View key={row.id}>
+            <PressableScale accessibilityLabel={`${row.eventTitle} ${row.selectionLabel}`} accessibilityRole="button" onPress={() => void openDetail(row.id)}>
+              <View style={[styles.row, { borderBottomColor: theme.border }]}>
+                <View style={[styles.marketIcon, { backgroundColor: theme.field }]}>
+                  <SoccerBall color={theme.textMuted} size={18} weight="regular" />
                 </View>
-              ))}
-            </Disclosure>
-          </Card>
+                <View style={styles.flex}>
+                  <Text numberOfLines={1} style={[styles.fixture, { color: theme.text }]}>{row.eventTitle}</Text>
+                  <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
+                    {row.selectionLabel} · {row.status}
+                  </Text>
+                </View>
+                <View style={styles.right}>
+                  <Text style={[styles.figure, { color: theme.text }]}>{money(row.filledUsdc > 0 ? row.filledUsdc : row.stakeUsdc)}</Text>
+                  <StatusPill label={row.status} tone={toneFor(row.status)} />
+                </View>
+              </View>
+            </PressableScale>
+
+            {detail?.id === row.id ? (
+              <Card>
+                <DetailRows detail={detail} />
+                {detailError ? <Text style={[styles.error, { color: theme.danger }]}>{detailError}</Text> : null}
+                <ActionButton
+                  disabled={!detail.canClose}
+                  label={detail.canClose ? 'Close position' : 'No open position'}
+                  loading={busy}
+                  onPress={() => void closePosition()}
+                  variant="secondary"
+                />
+              </Card>
+            ) : null}
+          </View>
         ))
       ) : (
         <EmptyState
-          detail={
-            lens === 'all'
-              ? 'Bot decisions and manual orders appear here once your bot starts trading.'
-              : `No ${lens === 'open' ? 'open' : 'closed'} trades right now.`
-          }
-          title={lens === 'all' ? 'No trades yet' : 'Nothing here'}
+          detail={`No ${lens} trades right now. New signals appear here the moment your auto-trade places them.`}
+          title="Nothing here"
         />
       )}
-
-      {features.manualFootballTrading ? (
-        <PressableScale
-          accessibilityLabel="Cancel the most recent cancellable manual order"
-          accessibilityRole="button"
-          onPress={() => {
-            const cancellable = rows.find((row) => row.id.startsWith('order-') && row.open);
-            if (cancellable) void consumer('cancelManualOrder', { orderId: cancellable.id.replace('order-', '') }).then(refresh);
-          }}>
-          <Text style={[styles.hiddenHint, { color: theme.textMuted }]}>
-            Manual trading is enabled. Open manual orders include a cancel action in their detail.
-          </Text>
-        </PressableScale>
-      ) : null}
     </Screen>
   );
 }
 
+function DetailRows({ detail }: { detail: ConsumerAutoTradeDetail }) {
+  const { theme } = usePolyClawTheme();
+  const facts: [string, string][] = [
+    ['Maximum price', `${(detail.maxPrice * 100).toFixed(1)}¢`],
+    ['Stake', money(detail.stakeUsdc)],
+    ['Filled', money(detail.filledUsdc)],
+    ['Expires', new Date(detail.expiresAt).toLocaleString()],
+  ];
+  return (
+    <View>
+      {detail.note ? <Text style={[styles.note, { color: theme.textMuted }]}>{detail.note}</Text> : null}
+      {facts.map(([label, value]) => (
+        <View key={label} style={[styles.fact, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.factLabel, { color: theme.textMuted }]}>{label}</Text>
+          <Text style={[styles.factValue, { color: theme.text }]}>{value}</Text>
+        </View>
+      ))}
+      {detail.fills.length ? (
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Fills</Text>
+      ) : null}
+      {detail.fills.map((fill) => (
+        <View key={fill.occurredAt} style={[styles.fact, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.factLabel, { color: theme.textMuted }]}>{new Date(fill.occurredAt).toLocaleString()}</Text>
+          <Text style={[styles.factValue, { color: theme.text }]}>{fill.shares.toFixed(2)} @ {(fill.price * 100).toFixed(1)}¢</Text>
+        </View>
+      ))}
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
+      {detail.timeline.map((step) => (
+        <View key={step.at} style={[styles.fact, { borderBottomColor: theme.border }]}>
+          <Text style={[styles.factLabel, { color: theme.textMuted }]}>{step.label}</Text>
+          <Text style={[styles.factValue, { color: theme.text }]}>{new Date(step.at).toLocaleTimeString()}</Text>
+        </View>
+      ))}
+      {detail.failureReason ? <Text style={[styles.error, { color: theme.danger }]}>{detail.failureReason}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  detail: { fontFamily: fonts.regular, fontSize: 12.5, marginTop: 3 },
+  error: { fontFamily: fonts.medium, fontSize: 12.5, marginTop: spacing.sm },
   fact: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 40 },
-  factLabel: { flex: 1, fontFamily: fonts.medium, fontSize: 12 },
-  factValue: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 12, textAlign: 'right' },
-  figure: { fontFamily: fonts.displayExtraBold, fontSize: 17, fontVariant: ['tabular-nums'] },
-  flex: { flex: 1 },
-  fixture: { fontFamily: fonts.display, fontSize: 15 },
-  hiddenHint: { fontFamily: fonts.regular, fontSize: 11.5, lineHeight: 17 },
+  factLabel: { flex: 1, fontFamily: fonts.medium, fontSize: 12.5 },
+  factValue: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 12.5, textAlign: 'right', ...numeric },
+  figure: { fontFamily: fonts.bold, fontSize: 15, ...numeric },
+  fixture: { fontFamily: fonts.semibold, fontSize: 14.5 },
+  flex: { flex: 1, minWidth: 0 },
   lens: { alignItems: 'center', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44 },
-  lensRow: { flexDirection: 'row', gap: spacing.sm },
+  lensRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   lensText: { fontFamily: fonts.bold, fontSize: 12.5 },
+  marketIcon: { alignItems: 'center', borderRadius: radius.pill, height: 40, justifyContent: 'center', width: 40 },
+  note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, marginBottom: spacing.sm },
   right: { alignItems: 'flex-end', gap: 6 },
-  rowTop: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.md },
+  row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm },
+  sectionTitle: { fontFamily: fonts.semibold, fontSize: 15, marginBottom: spacing.xs, marginTop: spacing.md },
+  sub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
 });
