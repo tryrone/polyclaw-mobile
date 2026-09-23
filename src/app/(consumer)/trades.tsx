@@ -154,15 +154,15 @@ function DetailRows({ detail }: { detail: ConsumerAutoTradeDetail }) {
       {detail.fills.length ? (
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Fills</Text>
       ) : null}
-      {detail.fills.map((fill) => (
-        <View key={fill.occurredAt} style={[styles.fact, { borderBottomColor: theme.border }]}>
+      {detail.fills.map((fill, index) => (
+        <View key={`${fill.occurredAt}:${index}`} style={[styles.fact, { borderBottomColor: theme.border }]}>
           <Text style={[styles.factLabel, { color: theme.textMuted }]}>{new Date(fill.occurredAt).toLocaleString()}</Text>
           <Text style={[styles.factValue, { color: theme.text }]}>{fill.shares.toFixed(2)} @ {(fill.price * 100).toFixed(1)}¢</Text>
         </View>
       ))}
       <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
       {detail.timeline.map((step) => (
-        <View key={step.at} style={[styles.fact, { borderBottomColor: theme.border }]}>
+        <View key={`${step.label}:${step.at}`} style={[styles.fact, { borderBottomColor: theme.border }]}>
           <Text style={[styles.factLabel, { color: theme.textMuted }]}>{step.label}</Text>
           <Text style={[styles.factValue, { color: theme.text }]}>{new Date(step.at).toLocaleTimeString()}</Text>
         </View>
