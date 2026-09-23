@@ -1,12 +1,14 @@
 import { randomUUID } from 'expo-crypto';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { AdminUsersSkeleton } from '@/components/page-skeletons';
+import { PnlChartCard } from '@/components/pnl-chart-card';
+import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
-import type { AdminEligibilityRow, AdminPublisher } from '@/lib/types';
+import type { AdminEligibilityRow, AdminPublisher, AutoTradePerformance } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 type PublisherStatus = { isAdministrator: boolean; granted: boolean; status: string | null; grantedAt: string | null };
@@ -25,6 +27,53 @@ export default function AdminUsersScreen() {
   const [grantUserId, setGrantUserId] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [performanceUserId, setPerformanceUserId] = useState<string | null>(null);
+  const [userPerformance, setUserPerformance] = useState<AutoTradePerformance | null>(null);
+  const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [performanceError, setPerformanceError] = useState<string | null>(null);
+  const performanceRequest = useRef(0);
+
+  const loadPerformance = useCallback(async (userId: string, clear = false) => {
+    const request = performanceRequest.current + 1;
+    performanceRequest.current = request;
+    if (clear) setUserPerformance(null);
+    setPerformanceError(null);
+    setPerformanceLoading(true);
+    try {
+      const result = await admin<AutoTradePerformance>('tradePerformance', { range: '1M', mode: 'LIVE', userId });
+      if (performanceRequest.current === request) setUserPerformance(result);
+    } catch (error) {
+      if (performanceRequest.current === request) setPerformanceError(error instanceof Error ? error.message : 'Could not load user performance.');
+    } finally {
+      if (performanceRequest.current === request) setPerformanceLoading(false);
+    }
+  }, [admin]);
+
+  const togglePerformance = async (userId: string) => {
+    if (performanceUserId === userId) {
+      performanceRequest.current += 1;
+      setPerformanceUserId(null);
+      setUserPerformance(null);
+      setPerformanceError(null);
+      setPerformanceLoading(false);
+      return;
+    }
+    setPerformanceUserId(userId);
+    await loadPerformance(userId, true);
+  };
+
+  useEffect(() => {
+    if (!performanceUserId) return;
+    const timer = setInterval(() => void loadPerformance(performanceUserId), 30_000);
+    return () => clearInterval(timer);
+  }, [loadPerformance, performanceUserId]);
+
+  const refresh = () => Promise.all([
+    directory.refresh(),
+    publishers.refresh(),
+    publisherStatus.refresh(),
+    ...(performanceUserId ? [loadPerformance(performanceUserId)] : []),
+  ]);
 
   const rows = (directory.data ?? []).filter((row) => !query.trim() || `${row.email} ${row.name ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()));
   const initialLoading = (directory.loading && directory.data === null)
@@ -60,14 +109,14 @@ export default function AdminUsersScreen() {
   };
 
   if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={directory.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void refresh()} tintColor={theme.accent} />}>
       <Header title="Users" />
       <ResourceState loading loadingFallback={<AdminUsersSkeleton />} />
     </Screen>
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={directory.loading} onRefresh={directory.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={directory.loading || performanceLoading} onRefresh={() => void refresh()} tintColor={theme.accent} />}>
       <Header title="Users" />
       <ResourceState error={directory.error} />
       {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
@@ -82,15 +131,29 @@ export default function AdminUsersScreen() {
       />
 
       {rows.length ? rows.map((row) => (
-        <View key={row.userId} style={[styles.row, { borderBottomColor: theme.border }]}>
-          <View style={styles.flex}>
-            <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{row.name ?? row.email}</Text>
-            <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
-              {money(row.perTradeUsdc)}/trade · {money(row.dailyUsdc)}/day · consent v{row.consentVersion ?? '—'}
-            </Text>
-            {row.blockingReason ? <Text numberOfLines={2} style={[styles.blocking, { color: theme.warning }]}>{row.blockingReason}</Text> : null}
-          </View>
-          <StatusPill label={row.eligible ? 'Eligible' : row.blockingCode ?? 'Blocked'} tone={row.eligible ? 'success' : 'warning'} />
+        <View key={row.userId}>
+          <PressableScale accessibilityLabel={`View ${row.name ?? row.email} 30-day PnL`} accessibilityRole="button" onPress={() => void togglePerformance(row.userId)}>
+            <View style={[styles.row, { borderBottomColor: theme.border }]}>
+              <View style={styles.flex}>
+                <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{row.name ?? row.email}</Text>
+                <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
+                  {money(row.perTradeUsdc)}/trade · {money(row.dailyUsdc)}/day · consent v{row.consentVersion ?? '—'}
+                </Text>
+                {row.blockingReason ? <Text numberOfLines={2} style={[styles.blocking, { color: theme.warning }]}>{row.blockingReason}</Text> : null}
+              </View>
+              <StatusPill label={row.eligible ? 'Eligible' : row.blockingCode ?? 'Blocked'} tone={row.eligible ? 'success' : 'warning'} />
+            </View>
+          </PressableScale>
+          {performanceUserId === row.userId ? (
+            <PnlChartCard
+              compact
+              data={userPerformance}
+              error={performanceError}
+              loading={performanceLoading}
+              showQuality
+              title={`${row.name ?? row.email} · 30-day PnL`}
+            />
+          ) : null}
         </View>
       )) : <Text style={[styles.copy, { color: theme.textMuted }]}>No Auto-trade users yet.</Text>}
 

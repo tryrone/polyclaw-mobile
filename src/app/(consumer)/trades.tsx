@@ -4,10 +4,11 @@ import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { ConsumerTradesSkeleton } from '@/components/page-skeletons';
+import { PnlChartCard } from '@/components/pnl-chart-card';
 import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { ConsumerAutoTradeDetail, ConsumerAutoTradeRow } from '@/lib/types';
+import type { AutoTradePerformance, AutoTradePerformanceRange, ConsumerAutoTradeDetail, ConsumerAutoTradeRow } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 type Lens = 'pending' | 'open' | 'closed';
@@ -35,7 +36,10 @@ export default function ConsumerTradesScreen() {
   const { theme } = usePolyClawTheme();
   const { consumer } = useAuth();
   const [lens, setLens] = useState<Lens>('pending');
+  const [range, setRange] = useState<AutoTradePerformanceRange>('1M');
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const resource = useConsumerResource<ConsumerAutoTradeRow[]>('autoTradeTrades', { filter: lens }, 20_000);
+  const performance = useConsumerResource<AutoTradePerformance>('autoTradePerformance', { range, timeZone }, 20_000);
   const [detail, setDetail] = useState<ConsumerAutoTradeDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,16 +70,24 @@ export default function ConsumerTradesScreen() {
   };
 
   if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header title="Trades" />
       <ResourceState loading loadingFallback={<ConsumerTradesSkeleton />} />
     </Screen>
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading || performance.loading} onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header title="Trades" />
       <ResourceState error={resource.error} />
+
+      <PnlChartCard
+        data={performance.data?.range === range ? performance.data : null}
+        error={performance.error}
+        loading={performance.loading || Boolean(performance.data && performance.data.range !== range)}
+        onRangeChange={setRange}
+        range={range}
+      />
 
       <View style={styles.lensRow}>
         {lenses.map((item) => {

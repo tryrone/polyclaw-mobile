@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Disclosure } from '@/components/disclosure';
+import { PnlChartCard } from '@/components/pnl-chart-card';
 import { ConsumerHomeSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { ConsumerHomeStatus, PolyClawPrimaryAction } from '@/lib/types';
+import type { AutoTradePerformance, ConsumerHomeStatus, PolyClawPrimaryAction } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 /**
@@ -20,6 +21,8 @@ export default function ConsumerHome() {
   const { theme } = usePolyClawTheme();
   const { consumer } = useAuth();
   const resource = useConsumerResource<ConsumerHomeStatus>('homeStatus', undefined, 20_000);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const performance = useConsumerResource<AutoTradePerformance>('autoTradePerformance', { range: '1M', timeZone }, 20_000);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [perTrade, setPerTrade] = useState('');
@@ -73,14 +76,14 @@ export default function ConsumerHome() {
   const initialLoading = resource.loading && !data;
 
   if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header action={<StatusPill label="SYNCING" tone="neutral" />} title="Auto-trade" />
       <ResourceState loading loadingFallback={<ConsumerHomeSkeleton />} />
     </Screen>
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading || performance.loading} onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header action={<StatusPill label={heroState} live={data?.enabled} tone={heroTone} />} title="Auto-trade" />
       <ResourceState error={resource.error} />
 
@@ -163,6 +166,13 @@ export default function ConsumerHome() {
         label={primaryLabel}
         loading={busy}
         onPress={onPrimary}
+      />
+
+      <PnlChartCard
+        data={performance.data}
+        error={performance.error}
+        loading={performance.loading}
+        title="30-day PnL"
       />
 
       <View style={styles.previewHeader}>

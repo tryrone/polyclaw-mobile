@@ -5,9 +5,10 @@ import { Alert, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
 import { AdminTradesSkeleton } from '@/components/page-skeletons';
+import { PnlChartCard } from '@/components/pnl-chart-card';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
-import type { AdminDeliveryRow, AdminSignalBatch } from '@/lib/types';
+import type { AdminDeliveryRow, AdminSignalBatch, AutoTradePerformance, AutoTradePerformanceRange } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 const filters = ['ALL', 'OPEN', 'FILLED', 'FAILED', 'SKIPPED'] as const;
@@ -21,11 +22,14 @@ export default function AdminTradesScreen() {
   const { theme } = usePolyClawTheme();
   const { admin } = useAuth();
   const [filter, setFilter] = useState<Filter>('ALL');
+  const [range, setRange] = useState<AutoTradePerformanceRange>('1M');
+  const [mode, setMode] = useState<'LIVE' | 'PAPER'>('LIVE');
   const [message, setMessage] = useState<string | null>(null);
   const [cancellingBatchId, setCancellingBatchId] = useState<string | null>(null);
   const [retryBatch, setRetryBatch] = useState<AdminSignalBatch | null>(null);
   const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', filter === 'ALL' ? { limit: 150 } : { status: filter, limit: 150 }, 20_000);
   const published = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'PUBLISHED', limit: 30 }, 20_000);
+  const performance = useAdminResource<AutoTradePerformance>('tradePerformance', { range, mode }, 20_000);
   const rows = resource.data ?? [];
   const initialLoading = (resource.loading && resource.data === null) || (published.loading && published.data === null);
 
@@ -62,14 +66,14 @@ export default function AdminTradesScreen() {
   };
 
   if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void Promise.all([resource.refresh(), published.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header title="Published" />
       <ResourceState loading loadingFallback={<AdminTradesSkeleton />} />
     </Screen>
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading || published.loading || performance.loading} onRefresh={() => void Promise.all([resource.refresh(), published.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
       <Header title="Published" />
       <ResourceState error={resource.error} />
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
@@ -81,6 +85,18 @@ export default function AdminTradesScreen() {
           variant="secondary"
         />
       ) : null}
+
+      <PnlChartCard
+        data={performance.data?.range === range && performance.data.mode === mode ? performance.data : null}
+        error={performance.error}
+        loading={performance.loading || Boolean(performance.data && (performance.data.range !== range || performance.data.mode !== mode))}
+        mode={mode}
+        onModeChange={setMode}
+        onRangeChange={setRange}
+        range={range}
+        showQuality
+        title="Platform trade PnL"
+      />
 
       {published.data?.length ? (
         <View style={styles.batchSection}>

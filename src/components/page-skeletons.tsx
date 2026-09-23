@@ -59,6 +59,7 @@ export function ConsumerHomeSkeleton() {
     <LoadingSurface label="Loading auto-trade overview">
       <Skeleton radius={radius.md} style={styles.homeHero} />
       <Skeleton radius={radius.sm} style={styles.action} />
+      <Skeleton radius={radius.md} style={styles.performanceCard} />
       <SectionStub width="18%" />
       <ListRow status />
       <ListRow status />
@@ -69,6 +70,7 @@ export function ConsumerHomeSkeleton() {
 export function ConsumerTradesSkeleton() {
   return (
     <LoadingSurface label="Loading trades">
+      <Skeleton radius={radius.md} style={styles.performanceCard} />
       <FilterRow count={3} />
       <ListRow icon />
       <ListRow icon />
@@ -113,6 +115,7 @@ export function AdminGamesSkeleton() {
 export function AdminTradesSkeleton() {
   return (
     <LoadingSurface label="Loading published trades">
+      <Skeleton radius={radius.md} style={styles.performanceCard} />
       <SectionStub width="36%" />
       <ListRow status={false} />
       <FilterRow count={5} />
@@ -166,6 +169,7 @@ const styles = StyleSheet.create({
   homeHero: { height: 176, width: '100%' },
   input: { flex: 1, height: 44, width: '100%' },
   pill: { height: 25, width: 68 },
+  performanceCard: { height: 250, width: '100%' },
   profileRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm },
   rowCopy: { flex: 1, gap: 8, minWidth: 0 },

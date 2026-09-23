@@ -27,7 +27,7 @@ function cents(value: number | null) {
   return value == null ? '—' : `${Math.round(value * 100)}¢`;
 }
 
-/** Game → market → outcome → review. Only the four launch market families are returned. */
+/** Game → market → outcome → review. The server returns only verified admin market families. */
 export default function AdminGamesScreen() {
   const { theme } = usePolyClawTheme();
   const { admin } = useAuth();

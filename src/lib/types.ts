@@ -44,6 +44,17 @@ export type ConsumerDashboard = {
 export type PilotAccessRequest = { id: string; status: 'PENDING' | 'FULFILLED' | 'CLOSED'; requestedAt: string };
 
 export type ConsumerMode = 'PAPER' | 'LIVE_LOCKED' | 'LIVE';
+export type AutoTradePerformanceRange = '1W' | '1M' | '3M' | 'ALL';
+export type AutoTradePerformance = {
+  range: AutoTradePerformanceRange;
+  mode: 'PAPER' | 'LIVE';
+  timeZone: string;
+  summary: { netPnlUsdc: number; roiFraction: number; settledTrades: number; filledCostUsdc: number; feesUsdc: number };
+  points: { at: string; cumulativePnlUsdc: number }[];
+  trackedFrom: string | null;
+  asOf: string;
+  dataQuality: { excludedRecords: number };
+};
 export type ConsumerPortfolioPoint = { at: string; equityUsdc: number; tradingPnlUsdc: number; returnFraction: number; drawdownFraction: number; source: 'BOT' | 'MANUAL' | 'COMBINED' };
 export type ConsumerManualOrder = {
   id: string; fixtureLabel: string; marketLabel: string; selectionLabel: string; kickoff: string; limitPrice: number;
@@ -66,7 +77,7 @@ export type ConsumerFootballMarket = {
   competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null; liquidityUsdc: number;
 };
 export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
-export type AdminFootballMarketType = 'MATCH_WINNER' | 'DOUBLE_CHANCE' | 'TOTAL_2_5' | 'BTTS';
+export type AdminFootballMarketType = 'MATCH_WINNER' | 'DOUBLE_CHANCE' | 'TOTAL_1_5' | 'TOTAL_2_5' | 'BTTS' | 'CORNERS_TOTAL';
 export type AdminFootballGame = {
   id: string; eventTitle: string; competition: string | null; country: string | null; homeTeam: string; awayTeam: string;
   kickoff: string; marketTypes: AdminFootballMarketType[]; outcomeCount: number;
