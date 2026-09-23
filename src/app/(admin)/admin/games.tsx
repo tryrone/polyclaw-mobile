@@ -6,6 +6,7 @@ import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-
 
 import { useAuth } from '@/auth/provider';
 import { PressableScale } from '@/components/motion';
+import { AdminGamesSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminBatchPreview, AdminFootballGame, AdminFootballGameMarkets, AdminFootballGames, AdminFootballOutcome, AdminSignalBatch, AdminSignalRow } from '@/lib/types';
@@ -192,6 +193,15 @@ export default function AdminGamesScreen() {
     ]);
   };
 
+  const initialLoading = !games && !selected && (catalogueLoading || drafts.loading);
+
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
+      <Header eyebrow="ADMIN" title="Games" />
+      <ResourceState loading loadingFallback={<AdminGamesSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
       <Header eyebrow="ADMIN" title={selected ? selected.game.eventTitle : 'Games'} />
@@ -213,7 +223,7 @@ export default function AdminGamesScreen() {
             {(['ALL', 'TODAY', 'TOMORROW'] as const).map((filter) => <FilterChip active={dateFilter === filter} key={filter} label={filter === 'ALL' ? '7 days' : filter === 'TODAY' ? 'Today' : 'Tomorrow'} onPress={() => setDateFilter(filter)} />)}
             {competitions.slice(0, 4).map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(competition === item ? null : item)} />)}
           </View>
-          <ResourceState error={catalogueError} loading={catalogueLoading && !games} />
+          <ResourceState error={catalogueError} />
           <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Loading games…' : `${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
           {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
           {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}

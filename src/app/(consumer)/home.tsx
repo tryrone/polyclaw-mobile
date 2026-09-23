@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Disclosure } from '@/components/disclosure';
+import { ConsumerHomeSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
@@ -69,11 +70,19 @@ export default function ConsumerHome() {
         : data?.primaryAction === 'NONE' ? 'View account'
           : 'Set up auto-trade';
   const PrimaryIcon = data?.primaryAction === 'PAUSE' ? Pause : data?.primaryAction === 'FUND' ? Wallet : data?.primaryAction === 'ENABLE' ? Play : Check;
+  const initialLoading = resource.loading && !data;
+
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+      <Header action={<StatusPill label="SYNCING" tone="neutral" />} title="Auto-trade" />
+      <ResourceState loading loadingFallback={<ConsumerHomeSkeleton />} />
+    </Screen>
+  );
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
       <Header action={<StatusPill label={heroState} live={data?.enabled} tone={heroTone} />} title="Auto-trade" />
-      <ResourceState error={resource.error} loading={resource.loading} />
+      <ResourceState error={resource.error} />
 
       <View style={[styles.hero, { backgroundColor: theme.text }]}>
         <Text style={[styles.heroLabel, { color: theme.background }]}>TODAY REMAINING</Text>

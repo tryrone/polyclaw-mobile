@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 import { SignOut } from 'phosphor-react-native';
 
 import { ThemePicker } from '@/components/theme-picker';
+import { ConsumerAccountSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Header, ResourceState, Screen } from '@/components/ui-kit';
 import { SignerItem } from '@/features/account/access-items';
 import { SubscriptionItem, WalletItem } from '@/features/account/membership-items';
@@ -20,10 +21,19 @@ import { usePolyClawTheme } from '@/theme';
 export default function ConsumerAccountScreen() {
   const { theme } = usePolyClawTheme();
   const controller = useAccountController();
+  const initialLoading = controller.resource.loading && controller.resource.data === null;
+
+  if (initialLoading) return (
+    <Screen>
+      <Header title="Account" />
+      <ResourceState loading loadingFallback={<ConsumerAccountSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen>
       <Header title="Account" />
-      <ResourceState error={controller.resource.error} loading={controller.resource.loading} />
+      <ResourceState error={controller.resource.error} />
       <AccountProfile email={controller.profile.email} name={controller.profile.name} userId={controller.profile.id} />
       <AccountMessageBanner message={controller.ui.message} />
 

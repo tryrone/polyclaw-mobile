@@ -3,6 +3,7 @@ import { SignOut } from 'phosphor-react-native';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ThemePicker } from '@/components/theme-picker';
+import { AdminSettingsSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
@@ -59,13 +60,24 @@ export default function AdminSettingsScreen() {
   };
 
   const data = control.data;
+  const initialLoading = (control.loading && control.data === null)
+    || (connections.loading && connections.data === null)
+    || (audit.loading && audit.data === null);
+
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={control.refresh} tintColor={theme.accent} />}>
+      <Header action={<StatusPill label="SYNCING" tone="neutral" />} title="Settings" />
+      <ResourceState loading loadingFallback={<AdminSettingsSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen refreshControl={<RefreshControl refreshing={control.loading} onRefresh={control.refresh} tintColor={theme.accent} />}>
       <Header
         action={<StatusPill label={data?.globallyPaused ? 'HALTED' : 'RUNNING'} live={!data?.globallyPaused} tone={data?.globallyPaused ? 'danger' : 'success'} />}
         title="Settings"
       />
-      <ResourceState error={control.error} loading={control.loading && !data} />
+      <ResourceState error={control.error} />
       {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
 
       <Card>

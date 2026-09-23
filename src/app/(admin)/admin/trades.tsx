@@ -4,6 +4,7 @@ import { Alert, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
+import { AdminTradesSkeleton } from '@/components/page-skeletons';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminDeliveryRow, AdminSignalBatch } from '@/lib/types';
@@ -26,6 +27,7 @@ export default function AdminTradesScreen() {
   const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', filter === 'ALL' ? { limit: 150 } : { status: filter, limit: 150 }, 20_000);
   const published = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'PUBLISHED', limit: 30 }, 20_000);
   const rows = resource.data ?? [];
+  const initialLoading = (resource.loading && resource.data === null) || (published.loading && published.data === null);
 
   const cancelBatch = async (batch: AdminSignalBatch) => {
     setCancellingBatchId(batch.id);
@@ -59,10 +61,17 @@ export default function AdminTradesScreen() {
     );
   };
 
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+      <Header title="Published" />
+      <ResourceState loading loadingFallback={<AdminTradesSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
       <Header title="Published" />
-      <ResourceState error={resource.error} loading={resource.loading && !rows.length} />
+      <ResourceState error={resource.error} />
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
       {retryBatch ? (
         <ActionButton

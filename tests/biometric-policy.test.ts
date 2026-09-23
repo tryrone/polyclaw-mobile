@@ -1,11 +1,32 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
-import { recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '../src/auth/biometric-policy';
+import { nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '../src/auth/biometric-policy';
+
+const authProvider = readFileSync('src/auth/provider.tsx', 'utf8');
 
 describe('PolyClaw biometric policy', () => {
   it('locks after 60 seconds but not at 59 seconds', () => {
     assert.equal(shouldRelockAfterBackground(1_000, 60_000, true), false);
     assert.equal(shouldRelockAfterBackground(1_000, 62_000, true), true);
+  });
+
+  it('keeps an unlocked session unlocked during a transparent token refresh', () => {
+    assert.equal(nextLockStateAfterSessionSave({
+      hasSession: true,
+      recoveryPending: false,
+      preserveCurrentLock: true,
+      currentlyLocked: false,
+    }), false);
+    assert.equal(nextLockStateAfterSessionSave({
+      hasSession: true,
+      recoveryPending: false,
+      preserveCurrentLock: true,
+      currentlyLocked: true,
+    }), true);
+
+    const adminRefresh = authProvider.match(/const admin = useCallback[\s\S]*?\n  }, \[[^\]]+\]\);/)?.[0] ?? '';
+    assert.match(adminRefresh, /save\(next, \{ preserveCurrentLock: true \}\)/);
   });
 
   it('requires biometrics for admins, active pilots, and live wallets', () => {

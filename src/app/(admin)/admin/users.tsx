@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
+import { AdminUsersSkeleton } from '@/components/page-skeletons';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminEligibilityRow, AdminPublisher } from '@/lib/types';
@@ -26,6 +27,9 @@ export default function AdminUsersScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   const rows = (directory.data ?? []).filter((row) => !query.trim() || `${row.email} ${row.name ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const initialLoading = (directory.loading && directory.data === null)
+    || (publishers.loading && publishers.data === null)
+    || (publisherStatus.loading && publisherStatus.data === null);
 
   const grant = async (requestedUserId?: string) => {
     const userId = requestedUserId?.trim() || grantUserId.trim();
@@ -55,10 +59,17 @@ export default function AdminUsersScreen() {
     }
   };
 
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={directory.refresh} tintColor={theme.accent} />}>
+      <Header title="Users" />
+      <ResourceState loading loadingFallback={<AdminUsersSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen refreshControl={<RefreshControl refreshing={directory.loading} onRefresh={directory.refresh} tintColor={theme.accent} />}>
       <Header title="Users" />
-      <ResourceState error={directory.error} loading={directory.loading && !directory.data?.length} />
+      <ResourceState error={directory.error} />
       {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
 
       <TextInput

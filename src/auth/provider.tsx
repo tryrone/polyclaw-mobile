@@ -5,7 +5,7 @@ import { adminRequest, consumerRequest, loginUser, loginWithApple, logoutUser, o
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import { signInWithGoogle as googleSignIn } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
-import { recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
+import { nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
 
 type AuthState = 'hydrating' | 'anonymous' | 'authenticated';
 type AuthValue = {
@@ -50,15 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     readBiometricEnabled().then(setBiometricEnabledState).catch(() => undefined);
   }, []);
 
-  const save = useCallback(async (next: AuthSession | null) => {
+  const save = useCallback(async (next: AuthSession | null, options: { preserveCurrentLock?: boolean } = {}) => {
+    const pendingRecovery = recoveryPending.current;
     setSession(next);
     setState(next ? 'authenticated' : 'anonymous');
     setSecurityResolved(!next);
-    setLocked(Boolean(next) && !recoveryPending.current);
-    if (next && recoveryPending.current) {
+    setLocked((currentlyLocked) => nextLockStateAfterSessionSave({
+      hasSession: Boolean(next),
+      recoveryPending: pendingRecovery,
+      preserveCurrentLock: options.preserveCurrentLock ?? false,
+      currentlyLocked,
+    }));
+    if (next && pendingRecovery) {
       recoveryPending.current = false;
       setRecoveryMode(true);
-      setLocked(false);
     } else if (!next) setRecoveryMode(false);
     await writeSession(next);
   }, []);
@@ -135,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) throw Object.assign(new Error('Sign in required'), { status: 401 });
     if (new Date(session.expiresAt).getTime() > Date.now() + 30_000) return session;
     const next = await refreshUser(session.refreshToken);
-    await save(next);
+    await save(next, { preserveCurrentLock: true });
     return next;
   }, [save, session]);
 
@@ -146,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch (error) {
       if ((error as Error & { data?: { httpStatus?: number } }).data?.httpStatus !== 401) throw error;
       const next = await refreshUser(active.refreshToken);
-      await save(next);
+      await save(next, { preserveCurrentLock: true });
       return consumerRequest<T>(next.accessToken, procedure, input);
     }
   }, [freshSession, recoveryMode, save]);
@@ -157,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch (error) {
       if ((error as Error & { data?: { httpStatus?: number } }).data?.httpStatus !== 401) throw error;
       const next = await refreshUser(active.refreshToken);
-      await save(next);
+      await save(next, { preserveCurrentLock: true });
       return adminRequest<T>(next.accessToken, procedure, input);
     }
   }, [freshSession, save]);
@@ -170,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error instanceof Error && error.message.includes('Recent authentication')) throw error;
       try {
         const next = await refreshUser(active.refreshToken);
-        await save(next);
+        await save(next, { preserveCurrentLock: true });
         return await operatorRequest<T>(path, next.accessToken, init);
       } catch (refreshError) {
         await save(null);

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
+import { ConsumerTradesSkeleton } from '@/components/page-skeletons';
 import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
@@ -40,6 +41,7 @@ export default function ConsumerTradesScreen() {
   const [busy, setBusy] = useState(false);
 
   const rows = useMemo(() => resource.data ?? [], [resource.data]);
+  const initialLoading = resource.loading && resource.data === null;
 
   const openDetail = useCallback(async (id: string) => {
     if (detail?.id === id) { setDetail(null); return; }
@@ -63,10 +65,17 @@ export default function ConsumerTradesScreen() {
     }
   };
 
+  if (initialLoading) return (
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={resource.refresh} tintColor={theme.accent} />}>
+      <Header title="Trades" />
+      <ResourceState loading loadingFallback={<ConsumerTradesSkeleton />} />
+    </Screen>
+  );
+
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
       <Header title="Trades" />
-      <ResourceState error={resource.error} loading={resource.loading && !rows.length} />
+      <ResourceState error={resource.error} />
 
       <View style={styles.lensRow}>
         {lenses.map((item) => {

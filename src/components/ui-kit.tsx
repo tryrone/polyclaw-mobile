@@ -1,7 +1,7 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { LucideIcon } from '@/components/modern-icons';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, layout, radius, spacing, usePolyClawTheme, type Theme } from '@/theme';
 import { haptics, PulsingDot, PressableScale, Skeleton, Staggered, Ticker } from './motion';
@@ -101,9 +101,10 @@ export function EmptyState({ title, detail, icon: Icon }: { title: string; detai
   );
 }
 
-export function ResourceState({ loading, error, stale }: { loading?: boolean; error?: string | null; stale?: boolean }) {
+export function ResourceState({ loading, error, stale, loadingFallback }: { loading?: boolean; error?: string | null; stale?: boolean; loadingFallback?: ReactNode }) {
   const { theme } = usePolyClawTheme();
   if (loading) {
+    if (loadingFallback) return loadingFallback;
     return (
       <View style={styles.skeletonStack}>
         <Skeleton style={{ height: 132 }} radius={radius.md} />

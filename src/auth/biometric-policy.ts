@@ -1,5 +1,15 @@
 export const BIOMETRIC_BACKGROUND_LOCK_MS = 60_000;
 
+export function nextLockStateAfterSessionSave(input: {
+  hasSession: boolean;
+  recoveryPending: boolean;
+  preserveCurrentLock: boolean;
+  currentlyLocked: boolean;
+}) {
+  if (!input.hasSession || input.recoveryPending) return false;
+  return input.preserveCurrentLock ? input.currentlyLocked : true;
+}
+
 export function shouldRelockAfterBackground(backgroundedAt: number | null, resumedAt: number, protectedAccount: boolean) {
   return protectedAccount && backgroundedAt !== null && resumedAt - backgroundedAt >= BIOMETRIC_BACKGROUND_LOCK_MS;
 }
