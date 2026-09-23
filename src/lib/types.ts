@@ -66,6 +66,23 @@ export type ConsumerFootballMarket = {
   competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null; liquidityUsdc: number;
 };
 export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
+export type AdminFootballMarketType = 'MATCH_WINNER' | 'DOUBLE_CHANCE' | 'TOTAL_2_5' | 'BTTS';
+export type AdminFootballGame = {
+  id: string; eventTitle: string; competition: string | null; country: string | null; homeTeam: string; awayTeam: string;
+  kickoff: string; marketTypes: AdminFootballMarketType[]; outcomeCount: number;
+};
+export type AdminFootballOutcome = {
+  eventId: string; gameId: string; marketId: string; conditionId: string; tokenId: string; sport: 'football';
+  eventTitle: string; marketType: AdminFootballMarketType; marketLabel: string; selectionLabel: string; kickoff: string;
+  active: boolean; closed: boolean; acceptingOrders: boolean; competition: string | null; country: string | null;
+  homeTeam: string; awayTeam: string; liquidityUsdc: number; currentPrice: number | null;
+};
+export type AdminFootballGameMarkets = {
+  game: AdminFootballGame;
+  markets: { type: AdminFootballMarketType; label: string; outcomes: AdminFootballOutcome[] }[];
+  asOf: string;
+};
+export type AdminFootballGames = { items: AdminFootballGame[]; total: number; asOf: string; windowEndsAt: string };
 export type ConsumerAccount = {
   mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
@@ -339,9 +356,17 @@ export type AdminSignalRow = {
   outcomeTokenId: string; side: 'BUY'; eventTitle: string; marketLabel: string; selectionLabel: string;
   competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null;
   kickoff: string; maxPrice: number; expiresAt: string; note: string | null; status: string;
+  marketSnapshot: Record<string, unknown> | null;
 };
 
-export type AdminSignalValidation = { ordinal: number; valid: boolean; errors: string[]; market: boolean; acceptance: boolean; liquidityUsdc: number | null; bestAsk: number | null; verifiedAt: string | null };
+export type AdminSignalValidation = { ordinal: number; valid: boolean; errors: string[]; market: boolean; acceptance: boolean; liquidityUsdc: number | null; executableLiquidityUsdc: number | null; bestAsk: number | null; verifiedAt: string | null };
+export type AdminBatchPreview = {
+  batch: AdminSignalBatch & { signals: AdminSignalRow[] };
+  validation: { rows: AdminSignalValidation[]; publishable: boolean };
+  eligibleUsers: number; blockedUsers: number; blockedByCode: { code: string; count: number }[];
+  aggregateExposureUsdc: number;
+  signals: { ordinal: number; requestedUsdc: number; allocatedUsdc: number; executableLiquidityUsdc: number | null; bestAsk: number | null }[];
+};
 
 export type AdminDeliveryRow = {
   id: string; batchId: string; signalId: string; userId: string; email: string; eventTitle: string;

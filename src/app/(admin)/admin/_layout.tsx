@@ -13,7 +13,7 @@ import { useAuth } from '@/auth/provider';
  */
 const tabs: (TabItem & { name: string })[] = [
   { name: 'games', href: '/admin/games', label: 'Games', Icon: SoccerBall },
-  { name: 'trades', href: '/admin/trades', label: 'Trades', Icon: ChartLineUp },
+  { name: 'trades', href: '/admin/trades', label: 'Published', Icon: ChartLineUp },
   { name: 'users', href: '/admin/users', label: 'Users', Icon: UsersThree },
   { name: 'settings', href: '/admin/settings', label: 'Settings', Icon: GearSix },
 ];

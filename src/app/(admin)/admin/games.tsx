@@ -1,120 +1,116 @@
 import { randomUUID } from 'expo-crypto';
-import { Plus, Trash } from 'phosphor-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, MagnifyingGlass, Plus, Trash } from 'phosphor-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
-import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
+import { PressableScale } from '@/components/motion';
+import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAdminResource } from '@/hooks/use-admin-resource';
-import type { AdminSignalBatch, AdminSignalRow, AdminSignalValidation, ConsumerFootballCatalogue, ConsumerFootballMarket } from '@/lib/types';
+import type { AdminBatchPreview, AdminFootballGame, AdminFootballGameMarkets, AdminFootballGames, AdminFootballOutcome, AdminSignalBatch, AdminSignalRow } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 type BatchView = AdminSignalBatch & { signals: AdminSignalRow[] };
+type DateFilter = 'ALL' | 'TODAY' | 'TOMORROW';
 const SEARCH_DEBOUNCE_MS = 350;
 
-/**
- * Games: search the verified football catalogue, add games individually to a draft, validate
- * the full list, publish, and review the delivery summary. CSV, pasted URLs and in-play entry
- * are outside v1.
- */
+function isoDate(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function cents(value: number | null) {
+  return value == null ? '—' : `${Math.round(value * 100)}¢`;
+}
+
+/** Game → market → outcome → review. Only the four launch market families are returned. */
 export default function AdminGamesScreen() {
   const { theme } = usePolyClawTheme();
   const { admin } = useAuth();
-  const batches = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'DRAFT' }, 30_000);
-  const [batchId, setBatchId] = useState<string | null>(null);
+  const drafts = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'DRAFT' }, 30_000);
   const [batch, setBatch] = useState<BatchView | null>(null);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ConsumerFootballMarket[] | null>(null);
-  const [resultTotal, setResultTotal] = useState(0);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
+  const [competition, setCompetition] = useState<string | null>(null);
+  const [games, setGames] = useState<AdminFootballGames | null>(null);
+  const [selected, setSelected] = useState<AdminFootballGameMarkets | null>(null);
   const [catalogueError, setCatalogueError] = useState<string | null>(null);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
-  const [validation, setValidation] = useState<AdminSignalValidation[] | null>(null);
+  const [preview, setPreview] = useState<AdminBatchPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [edits, setEdits] = useState<Record<string, { maxPrice: string; expiryMinutes: string }>>({});
-  const searchRequest = useRef(0);
+  const requestId = useRef(0);
 
-  const loadBatch = async (id: string) => {
-    setBatchId(id);
-    setValidation(null);
-    setBatch(await admin<BatchView>('getBatch', { batchId: id }));
-  };
+  const competitions = useMemo(() => [...new Set((games?.items ?? []).map((game) => game.competition).filter((value): value is string => Boolean(value)))].sort(), [games]);
 
-  const startDraft = async () => {
-    setBusy(true);
-    try {
-      const created = await admin<AdminSignalBatch>('createDraft', { title: `Draft ${new Date().toLocaleDateString()}` });
-      await batches.refresh();
-      await loadBatch(created.id);
-      setMessage('Draft started. Search and add games.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const search = useCallback(async (searchQuery: string) => {
-    const request = searchRequest.current + 1;
-    searchRequest.current = request;
+  const loadGames = useCallback(async (searchQuery: string, filter: DateFilter, selectedCompetition: string | null) => {
+    const request = ++requestId.current;
     setCatalogueLoading(true);
     setCatalogueError(null);
     try {
-      const catalogue = await admin<ConsumerFootballCatalogue>('catalogueSearch', { query: searchQuery.trim() || undefined, pageSize: 25 });
-      if (request !== searchRequest.current) return;
-      setResults(catalogue.items);
-      setResultTotal(catalogue.total);
+      const result = await admin<AdminFootballGames>('catalogueGames', {
+        query: searchQuery.trim() || undefined,
+        date: filter === 'TODAY' ? isoDate() : filter === 'TOMORROW' ? isoDate(1) : undefined,
+        competition: selectedCompetition ?? undefined,
+      });
+      if (request === requestId.current) setGames(result);
     } catch (error) {
-      if (request !== searchRequest.current) return;
-      setCatalogueError(error instanceof Error ? error.message : 'Catalogue search failed.');
+      if (request === requestId.current) setCatalogueError(error instanceof Error ? error.message : 'Could not load games.');
     } finally {
-      if (request === searchRequest.current) setCatalogueLoading(false);
+      if (request === requestId.current) setCatalogueLoading(false);
     }
   }, [admin]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void search(query);
-    }, query.trim() ? SEARCH_DEBOUNCE_MS : 0);
+    const timer = setTimeout(() => void loadGames(query, dateFilter, competition), query.trim() ? SEARCH_DEBOUNCE_MS : 0);
     return () => clearTimeout(timer);
-  }, [query, search]);
+  }, [competition, dateFilter, loadGames, query]);
 
-  const addGame = async (market: ConsumerFootballMarket) => {
-    setBusy(true);
-    try {
-      let id = batchId;
-      if (!id) {
-        const created = await admin<AdminSignalBatch>('createDraft', { title: `Draft ${new Date().toLocaleDateString()}` });
-        id = created.id;
-        await batches.refresh();
-      }
-      await admin('addSignal', {
-        batchId: id,
-        item: {
-          eventId: market.eventId, marketId: market.marketId, conditionId: market.conditionId, outcomeTokenId: market.tokenId,
-          side: 'BUY', sport: 'football', eventTitle: market.eventTitle, marketLabel: market.marketLabel,
-          selectionLabel: market.selectionLabel, competition: market.competition, country: market.country,
-          homeTeam: market.homeTeam, awayTeam: market.awayTeam, kickoff: market.kickoff,
-          maxPrice: 0.99, expiresAt: market.kickoff, note: null,
-        },
-      });
-      await loadBatch(id);
-      setMessage(`${market.selectionLabel} added. Set its maximum price below.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not add this game.');
-    } finally {
-      setBusy(false);
-    }
+  const loadBatch = async (id: string) => {
+    setPreview(null);
+    setBatch(await admin<BatchView>('getBatch', { batchId: id }));
   };
 
-  const removeSignal = async (signalId: string) => {
-    if (!batchId) return;
+  const ensureDraft = async () => {
+    if (batch) return batch.id;
+    const created = await admin<AdminSignalBatch>('createDraft', { title: `Games · ${new Date().toLocaleDateString()}` });
+    await drafts.refresh();
+    setBatch({ ...created, signals: [] });
+    return created.id;
+  };
+
+  const openGame = async (game: AdminFootballGame) => {
+    setCatalogueLoading(true);
+    try { setSelected(await admin<AdminFootballGameMarkets>('catalogueGameMarkets', { gameId: game.id })); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'This game is no longer available.'); }
+    finally { setCatalogueLoading(false); }
+  };
+
+  const addOutcome = async (outcome: AdminFootballOutcome) => {
+    if (batch?.signals.some((signal) => signal.kickoff === outcome.kickoff && signal.eventTitle === outcome.eventTitle)) {
+      setMessage('Only one outcome per game can be included. Remove the current selection first.');
+      return;
+    }
     setBusy(true);
     try {
-      await admin('removeSignal', { batchId, signalId });
+      const batchId = await ensureDraft();
+      const defaultPrice = Math.min(0.99, Math.max(0.01, Math.ceil((outcome.currentPrice ?? 0.5) * 100) / 100));
+      await admin('addSignal', { batchId, item: {
+        eventId: outcome.eventId, marketId: outcome.marketId, conditionId: outcome.conditionId, outcomeTokenId: outcome.tokenId,
+        side: 'BUY', sport: 'football', eventTitle: outcome.eventTitle, marketLabel: outcome.marketLabel,
+        selectionLabel: outcome.selectionLabel, competition: outcome.competition, country: outcome.country,
+        homeTeam: outcome.homeTeam, awayTeam: outcome.awayTeam, kickoff: outcome.kickoff,
+        maxPrice: defaultPrice, expiresAt: new Date(new Date(outcome.kickoff).getTime() - 10 * 60_000).toISOString(), note: null,
+        marketSnapshot: { marketType: outcome.marketType, currentPrice: outcome.currentPrice, priceConfirmed: false },
+      } });
       await loadBatch(batchId);
-    } finally {
-      setBusy(false);
-    }
+      setSelected(null);
+      setMessage(`${outcome.selectionLabel} added. Confirm its price in Review.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not add this outcome.'); }
+    finally { setBusy(false); }
   };
 
   const editFor = (signal: AdminSignalRow) => edits[signal.id] ?? {
@@ -123,197 +119,157 @@ export default function AdminGamesScreen() {
   };
 
   const saveSignal = async (signal: AdminSignalRow) => {
-    if (!batchId) return;
+    if (!batch) return;
     const edit = editFor(signal);
-    const cents = Number(edit.maxPrice);
+    const price = Number(edit.maxPrice);
     const expiryMinutes = Number(edit.expiryMinutes);
     const expiresAt = new Date(new Date(signal.kickoff).getTime() - expiryMinutes * 60_000);
-    if (!Number.isFinite(cents) || cents < 1 || cents > 99 || !Number.isFinite(expiryMinutes) || expiryMinutes < 1 || expiresAt <= new Date()) {
-      setMessage('Use a 1–99¢ maximum price and an expiry at least one minute before kickoff.');
+    if (!Number.isFinite(price) || price < 1 || price > 99 || !Number.isFinite(expiryMinutes) || expiryMinutes < 1 || expiresAt <= new Date()) {
+      setMessage('Use a 1–99¢ maximum price and close at least one minute before kickoff.');
       return;
     }
     setBusy(true);
     try {
-      await admin('updateSignal', { batchId, signalId: signal.id, item: {
+      await admin('updateSignal', { batchId: batch.id, signalId: signal.id, item: {
         eventId: signal.eventId, marketId: signal.marketId, conditionId: signal.conditionId, outcomeTokenId: signal.outcomeTokenId,
         side: 'BUY', sport: 'football', eventTitle: signal.eventTitle, marketLabel: signal.marketLabel,
         selectionLabel: signal.selectionLabel, competition: signal.competition, country: signal.country,
         homeTeam: signal.homeTeam, awayTeam: signal.awayTeam, kickoff: signal.kickoff,
-        maxPrice: cents / 100, expiresAt: expiresAt.toISOString(), note: signal.note,
+        maxPrice: price / 100, expiresAt: expiresAt.toISOString(), note: signal.note,
+        marketSnapshot: { ...(signal.marketSnapshot ?? {}), priceConfirmed: true, publisherPriceConfirmedAt: new Date().toISOString() },
       } });
-      setValidation(null);
-      await loadBatch(batchId);
-      setMessage('Trade limits saved. Validate the list again.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save trade limits.');
-    } finally {
-      setBusy(false);
-    }
+      await loadBatch(batch.id);
+      setMessage('Maximum price confirmed.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save this selection.'); }
+    finally { setBusy(false); }
   };
 
-  const validate = async () => {
-    if (!batchId) return;
+  const removeSignal = async (signalId: string) => {
+    if (!batch) return;
+    setBusy(true);
+    try { await admin('removeSignal', { batchId: batch.id, signalId }); await loadBatch(batch.id); }
+    finally { setBusy(false); }
+  };
+
+  const moveSignal = async (signalId: string, direction: 'UP' | 'DOWN') => {
+    if (!batch) return;
+    setBusy(true);
+    try { await admin('moveSignal', { batchId: batch.id, signalId, direction }); await loadBatch(batch.id); }
+    finally { setBusy(false); }
+  };
+
+  const review = async () => {
+    if (!batch) return;
     setBusy(true);
     try {
-      const result = await admin<{ rows: AdminSignalValidation[]; publishable: boolean }>('validateBatch', { batchId });
-      setValidation(result.rows);
-      setMessage(result.publishable ? 'Every row is valid. Ready to publish.' : 'Some rows still need attention.');
-    } finally {
-      setBusy(false);
-    }
+      const result = await admin<AdminBatchPreview>('previewBatch', { batchId: batch.id });
+      setPreview(result);
+      setMessage(result.validation.publishable ? 'Checks passed. Review exposure, then publish.' : 'Fix the highlighted selections before publishing.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Preview failed.'); }
+    finally { setBusy(false); }
   };
 
   const publish = async () => {
-    if (!batchId) return;
-    setBusy(true);
-    try {
-      await admin('publishBatch', { batchId, idempotencyKey: randomUUID(), confirmed: true });
-      setMessage('Batch published. Eligible users received an independent limit order.');
-      setBatch(null);
-      setBatchId(null);
-      setValidation(null);
-      await batches.refresh();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Publish failed.');
-    } finally {
-      setBusy(false);
+    if (!batch || !preview?.validation.publishable) return;
+    const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
+    if (!hardware || !enrolled) {
+      Alert.alert('Device authentication required', 'Set up Face ID, Touch ID, or device authentication before publishing.');
+      return;
     }
-  };
-
-  const confirmPublish = () => {
-    if (!batch) return;
-    Alert.alert(
-      'Publish this list?',
-      `${batch.signals.length} trade${batch.signals.length === 1 ? '' : 's'} will be queued for users who are eligible now. This cannot be edited after publishing.`,
-      [{ text: 'Keep reviewing', style: 'cancel' }, { text: 'Publish', style: 'destructive', onPress: () => void publish() }],
-    );
+    const authentication = await LocalAuthentication.authenticateAsync({ promptMessage: 'Publish PolyClaw trades', cancelLabel: 'Cancel', disableDeviceFallback: false });
+    if (!authentication.success) return;
+    Alert.alert('Publish immutable batch?', `${batch.signals.length} selection${batch.signals.length === 1 ? '' : 's'} · ${preview.eligibleUsers} eligible users · up to ${money(preview.aggregateExposureUsdc)} aggregate exposure.`, [
+      { text: 'Keep reviewing', style: 'cancel' },
+      { text: 'Publish', style: 'destructive', onPress: async () => {
+        setBusy(true);
+        try {
+          await admin('publishBatch', { batchId: batch.id, idempotencyKey: randomUUID(), confirmed: true });
+          setBatch(null); setPreview(null); setMessage('Published and dispatched. The minute worker will recover any interrupted delivery.');
+          await drafts.refresh();
+        } catch (error) { setMessage(error instanceof Error ? error.message : 'Publish failed.'); }
+        finally { setBusy(false); }
+      } },
+    ]);
   };
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={batches.loading} onRefresh={batches.refresh} tintColor={theme.accent} />}>
-      <Header title="Games" />
-      <ResourceState error={batches.error} loading={batches.loading && !batches.data?.length} />
-      {message ? <Text style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
+    <Screen refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
+      <Header eyebrow="ADMIN" title={selected ? selected.game.eventTitle : 'Games'} />
+      {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
 
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>Verified catalogue</Text>
-      <View style={styles.searchRow}>
-        <TextInput
-          accessibilityLabel="Search verified football games"
-          onChangeText={setQuery}
-          onSubmitEditing={() => void search(query)}
-          placeholder="Search team or market"
-          placeholderTextColor={theme.textMuted}
-          style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-          value={query}
-        />
-        <ActionButton label={query.trim() ? 'Search' : 'Refresh'} loading={catalogueLoading} onPress={() => void search(query)} />
-      </View>
-      <Text accessibilityLiveRegion="polite" style={[styles.searchStatus, { color: catalogueError ? theme.danger : theme.textMuted }]}>
-        {catalogueLoading
-          ? 'Searching games…'
-          : catalogueError
-            ? catalogueError
-            : results
-              ? `${results.length} of ${resultTotal} available outcome${resultTotal === 1 ? '' : 's'}`
-              : 'Loading upcoming games…'}
-      </Text>
-      {results?.length ? results.map((market) => (
-        <PressableScale accessibilityLabel={`Add ${market.eventTitle} ${market.selectionLabel}`} accessibilityRole="button" key={`${market.conditionId}:${market.tokenId}`} onPress={() => void addGame(market)}>
-          <View style={[styles.row, { borderBottomColor: theme.border }]}>
-            <View style={styles.flex}>
-              <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>{market.eventTitle}</Text>
-              <Text numberOfLines={1} style={[styles.rowSub, { color: theme.textMuted }]}>{market.selectionLabel} · {new Date(market.kickoff).toLocaleString()}</Text>
-            </View>
-            <Plus color={theme.textMuted} size={18} />
-          </View>
-        </PressableScale>
-      )) : results ? <Text style={[styles.copy, { color: theme.textMuted }]}>No matching verified markets.</Text> : null}
-
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Draft</Text>
-        {!batch ? <ActionButton label="New draft" loading={busy} onPress={() => void startDraft()} variant="secondary" /> : null}
-      </View>
-      {batch ? (
-        <Card>
-          {batch.signals.length ? batch.signals.map((signal) => {
-            const row = validation?.find((item) => item.ordinal === signal.ordinal);
-            return (
-              <View key={signal.id} style={[styles.signalRow, { borderBottomColor: theme.border }]}>
-                <View style={styles.flex}>
-                  <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>{signal.eventTitle}</Text>
-                  <Text numberOfLines={1} style={[styles.rowSub, { color: theme.textMuted }]}>{signal.selectionLabel} · {new Date(signal.kickoff).toLocaleString()}</Text>
-                  <View style={styles.limitRow}>
-                    <View style={styles.limitField}>
-                      <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Max price (¢)</Text>
-                      <TextInput accessibilityLabel={`Maximum price for ${signal.selectionLabel} in cents`} keyboardType="number-pad" onChangeText={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...editFor(signal), maxPrice: value } }))} style={[styles.smallInput, { borderColor: theme.border, color: theme.text }]} value={editFor(signal).maxPrice} />
-                    </View>
-                    <View style={styles.limitField}>
-                      <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Close before kickoff (min)</Text>
-                      <TextInput accessibilityLabel={`Expiry before kickoff for ${signal.selectionLabel} in minutes`} keyboardType="number-pad" onChangeText={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...editFor(signal), expiryMinutes: value } }))} style={[styles.smallInput, { borderColor: theme.border, color: theme.text }]} value={editFor(signal).expiryMinutes} />
-                    </View>
-                  </View>
-                  <ActionButton label="Save limits" loading={busy} onPress={() => void saveSignal(signal)} variant="secondary" />
-                  {row && !row.valid ? <Text style={[styles.rowError, { color: theme.danger }]}>{row.errors.join(' ')}</Text> : null}
-                </View>
-                {row ? <StatusPill label={row.valid ? 'Valid' : 'Fix'} tone={row.valid ? 'success' : 'danger'} /> : null}
-                <PressableScale accessibilityLabel={`Remove ${signal.selectionLabel}`} accessibilityRole="button" onPress={() => void removeSignal(signal.id)}>
-                  <View style={styles.iconButton}><Trash color={theme.textMuted} size={17} /></View>
-                </PressableScale>
-              </View>
-            );
-          }) : <Text style={[styles.copy, { color: theme.textMuted }]}>Search and add games to build this batch.</Text>}
-          <View style={styles.actionRow}>
-            <ActionButton disabled={!batch.signals.length} label="Validate list" loading={busy} onPress={() => void validate()} variant="secondary" />
-            <ActionButton
-              disabled={!batch.signals.length || !(validation?.every((row) => row.valid))}
-              label="Publish batch"
-              loading={busy}
-              onPress={confirmPublish}
-            />
-          </View>
-        </Card>
+      {selected ? (
+        <>
+          <PressableScale accessibilityLabel="Back to games" accessibilityRole="button" onPress={() => setSelected(null)}><View style={styles.back}><ArrowLeft color={theme.text} size={18} /><Text style={[styles.backText, { color: theme.text }]}>All games</Text></View></PressableScale>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>{selected.game.competition ?? 'Football'} · {new Date(selected.game.kickoff).toLocaleString()}</Text>
+          {selected.markets.map((market) => <View key={market.type} style={styles.marketGroup}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>{market.label}</Text>
+            <View style={styles.outcomes}>{market.outcomes.map((outcome) => <PressableScale accessibilityLabel={`Select ${outcome.selectionLabel} at ${cents(outcome.currentPrice)}`} accessibilityRole="button" key={`${outcome.conditionId}:${outcome.tokenId}`} onPress={() => void addOutcome(outcome)}><View style={[styles.outcome, { backgroundColor: theme.panel, borderColor: theme.border }]}><Text style={[styles.outcomeLabel, { color: theme.text }]}>{outcome.selectionLabel}</Text><Text style={[styles.price, { color: theme.textMuted }]}>{cents(outcome.currentPrice)}</Text></View></PressableScale>)}</View>
+          </View>)}
+        </>
       ) : (
-        <EmptyState detail="Start a draft, then search the verified catalogue and add games one at a time." title="No draft selected" />
+        <>
+          <View style={[styles.search, { backgroundColor: theme.field, borderColor: theme.border }]}><MagnifyingGlass color={theme.textMuted} size={18} /><TextInput accessibilityLabel="Search upcoming games" onChangeText={setQuery} placeholder="Search teams" placeholderTextColor={theme.textMuted} style={[styles.searchInput, { color: theme.text }]} value={query} /></View>
+          <View style={styles.chips}>
+            {(['ALL', 'TODAY', 'TOMORROW'] as const).map((filter) => <FilterChip active={dateFilter === filter} key={filter} label={filter === 'ALL' ? '7 days' : filter === 'TODAY' ? 'Today' : 'Tomorrow'} onPress={() => setDateFilter(filter)} />)}
+            {competitions.slice(0, 4).map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(competition === item ? null : item)} />)}
+          </View>
+          <ResourceState error={catalogueError} loading={catalogueLoading && !games} />
+          <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Loading games…' : `${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
+          {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
+          {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}
+        </>
       )}
 
-      {batches.data?.length ? (
-        <>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Open drafts</Text>
-          {batches.data.filter((item) => item.id !== batch?.id).map((item) => (
-            <PressableScale accessibilityLabel={`Open draft ${item.title ?? item.id}`} accessibilityRole="button" key={item.id} onPress={() => void loadBatch(item.id)}>
-              <View style={[styles.row, { borderBottomColor: theme.border }]}>
-                <View style={styles.flex}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{item.title ?? 'Untitled draft'}</Text>
-                  <Text style={[styles.rowSub, { color: theme.textMuted }]}>{item.signalCount} signals · {new Date(item.createdAt).toLocaleDateString()}</Text>
-                </View>
-                <StatusPill label={item.status} tone="warning" />
-              </View>
-            </PressableScale>
-          ))}
-        </>
-      ) : null}
+      <View style={styles.sectionHeader}><Text style={[styles.sectionTitle, { color: theme.text }]}>Review</Text><StatusPill label={`${batch?.signals.length ?? 0} selected`} tone={batch?.signals.length ? 'success' : 'neutral'} /></View>
+      {batch?.signals.length ? <Card>
+        {batch.signals.map((signal, index) => {
+          const validation = preview?.validation.rows.find((row) => row.ordinal === signal.ordinal);
+          const edit = editFor(signal);
+          return <View key={signal.id} style={[styles.signal, { borderBottomColor: theme.border }]}>
+            <View style={styles.signalHeader}><Text style={[styles.ordinal, { color: theme.textMuted }]}>{signal.ordinal}</Text><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{signal.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{signal.marketLabel} · {signal.selectionLabel}</Text></View><View style={styles.reorder}><IconButton disabled={index === 0 || busy} label="Move earlier" onPress={() => void moveSignal(signal.id, 'UP')}><ArrowUp color={theme.textMuted} size={17} /></IconButton><IconButton disabled={index === batch.signals.length - 1 || busy} label="Move later" onPress={() => void moveSignal(signal.id, 'DOWN')}><ArrowDown color={theme.textMuted} size={17} /></IconButton><IconButton disabled={busy} label="Remove selection" onPress={() => void removeSignal(signal.id)}><Trash color={theme.danger} size={17} /></IconButton></View></View>
+            <View style={styles.fields}><Field label="Maximum price (¢)" value={edit.maxPrice} onChange={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...edit, maxPrice: value } }))} /><Field label="Close before kickoff (min)" value={edit.expiryMinutes} onChange={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...edit, expiryMinutes: value } }))} /></View>
+            <ActionButton icon={Check as never} label={signal.marketSnapshot?.priceConfirmed === true ? 'Price confirmed' : 'Confirm price'} loading={busy} onPress={() => void saveSignal(signal)} variant="secondary" />
+            {validation && !validation.valid ? <Text style={[styles.error, { color: theme.danger }]}>{validation.errors.join(' ')}</Text> : null}
+          </View>;
+        })}
+        <ActionButton label="Preview batch" loading={busy} onPress={() => void review()} variant="secondary" />
+      </Card> : <EmptyState detail="Open a game, choose a market, then choose one outcome." title="No games selected" />}
+
+      {preview ? <Card><Text style={[styles.sectionTitle, { color: theme.text }]}>Publish preview</Text><View style={styles.previewGrid}><PreviewFact label="Eligible" value={String(preview.eligibleUsers)} /><PreviewFact label="Blocked" value={String(preview.blockedUsers)} /><PreviewFact label="Exposure" value={money(preview.aggregateExposureUsdc)} /><PreviewFact label="Mode" value="Paper" /></View>{preview.blockedByCode.length ? <Text style={[styles.meta, { color: theme.textMuted }]}>{preview.blockedByCode.map((item) => `${item.count} ${item.code.toLowerCase().replaceAll('_', ' ')}`).join(' · ')}</Text> : null}<ActionButton disabled={!preview.validation.publishable} label="Authenticate & publish" loading={busy} onPress={() => void publish()} /></Card> : null}
+
+      {drafts.data?.some((item) => item.id !== batch?.id) ? <View><Text style={[styles.sectionTitle, { color: theme.text }]}>Saved drafts</Text>{drafts.data.filter((item) => item.id !== batch?.id).map((item) => <PressableScale accessibilityLabel={`Open ${item.title ?? 'draft'}`} accessibilityRole="button" key={item.id} onPress={() => void loadBatch(item.id)}><View style={[styles.game, { borderBottomColor: theme.border }]}><Text style={[styles.gameTitle, { color: theme.text }]}>{item.title ?? 'Untitled draft'}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{item.signalCount}</Text></View></PressableScale>)}</View> : null}
     </Screen>
   );
 }
 
+function FilterChip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  const { theme } = usePolyClawTheme();
+  return <PressableScale accessibilityRole="button" accessibilityState={{ selected: active }} haptic="select" onPress={onPress}><View style={[styles.chip, { backgroundColor: active ? theme.text : theme.field, borderColor: active ? theme.text : theme.border }]}><Text style={[styles.chipText, { color: active ? theme.background : theme.textMuted }]}>{label}</Text></View></PressableScale>;
+}
+
+function IconButton({ children, disabled, label, onPress }: { children: ReactNode; disabled?: boolean; label: string; onPress: () => void }) {
+  return <PressableScale accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress}><View style={[styles.iconButton, disabled && { opacity: 0.3 }]}>{children}</View></PressableScale>;
+}
+
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const { theme } = usePolyClawTheme();
+  return <View style={styles.field}><Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{label}</Text><TextInput accessibilityLabel={label} keyboardType="number-pad" onChangeText={onChange} style={[styles.input, { borderColor: theme.border, color: theme.text }]} value={value} /></View>;
+}
+
+function PreviewFact({ label, value }: { label: string; value: string }) {
+  const { theme } = usePolyClawTheme();
+  return <View style={styles.previewFact}><Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{label}</Text><Text style={[styles.previewValue, { color: theme.text }]}>{value}</Text></View>;
+}
+
 const styles = StyleSheet.create({
-  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  copy: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19 },
-  flex: { flex: 1, minWidth: 0 },
-  fieldLabel: { fontFamily: fonts.medium, fontSize: 11 },
-  iconButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  input: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, flex: 1, fontFamily: fonts.regular, fontSize: 14.5, minHeight: 44, paddingHorizontal: spacing.md },
-  message: { fontFamily: fonts.medium, fontSize: 12.5 },
-  limitField: { flex: 1, gap: 5 },
-  limitRow: { flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.sm },
-  row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm },
-  rowError: { fontFamily: fonts.medium, fontSize: 11.5, marginTop: 3 },
-  rowSub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2, ...numeric },
-  rowTitle: { fontFamily: fonts.semibold, fontSize: 14 },
-  signalRow: { alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.md },
-  smallInput: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.medium, fontSize: 14, minHeight: 44, paddingHorizontal: spacing.sm },
-  searchRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  searchStatus: { fontFamily: fonts.medium, fontSize: 12, marginTop: spacing.xs },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
-  sectionTitle: { fontFamily: fonts.semibold, fontSize: 17, marginBottom: spacing.sm, marginTop: spacing.lg },
+  back: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 44 }, backText: { fontFamily: fonts.semibold, fontSize: 14 },
+  chip: { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.md }, chipText: { fontFamily: fonts.semibold, fontSize: 12 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  error: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 }, field: { flex: 1, gap: 6 }, fieldLabel: { fontFamily: fonts.medium, fontSize: 11.5 }, fields: { flexDirection: 'row', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 },
+  game: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 68, paddingVertical: spacing.md }, gameTitle: { fontFamily: fonts.semibold, fontSize: 14.5, lineHeight: 20 },
+  iconButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 36 }, input: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.semibold, fontSize: 15, minHeight: 44, paddingHorizontal: spacing.sm, ...numeric },
+  marketGroup: { gap: spacing.sm }, message: { fontFamily: fonts.medium, fontSize: 12.5, lineHeight: 18 }, meta: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, ...numeric }, ordinal: { fontFamily: fonts.bold, fontSize: 12, paddingTop: 3, width: 18 },
+  outcome: { alignItems: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', minHeight: 52, paddingHorizontal: spacing.md }, outcomeLabel: { flex: 1, fontFamily: fonts.semibold, fontSize: 13.5 }, outcomes: { gap: spacing.sm }, price: { fontFamily: fonts.bold, fontSize: 13.5, ...numeric },
+  previewFact: { gap: 3, minWidth: '44%' }, previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }, previewValue: { fontFamily: fonts.bold, fontSize: 18, ...numeric }, reorder: { flexDirection: 'row' },
+  search: { alignItems: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, minHeight: 48, paddingHorizontal: spacing.md }, searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, minHeight: 46 },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg }, sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 }, signal: { borderBottomWidth: StyleSheet.hairlineWidth, gap: spacing.md, paddingVertical: spacing.md }, signalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.xs },
 });

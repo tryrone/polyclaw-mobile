@@ -61,7 +61,7 @@ export default function AdminTradesScreen() {
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={resource.loading} onRefresh={resource.refresh} tintColor={theme.accent} />}>
-      <Header title="Trades" />
+      <Header title="Published" />
       <ResourceState error={resource.error} loading={resource.loading && !rows.length} />
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
       {retryBatch ? (
