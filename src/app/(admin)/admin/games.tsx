@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { Plus, Trash } from 'phosphor-react-native';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill } from '@/components/ui-kit';
@@ -11,6 +11,7 @@ import type { AdminSignalBatch, AdminSignalRow, AdminSignalValidation, ConsumerF
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 type BatchView = AdminSignalBatch & { signals: AdminSignalRow[] };
+const SEARCH_DEBOUNCE_MS = 350;
 
 /**
  * Games: search the verified football catalogue, add games individually to a draft, validate
@@ -25,10 +26,14 @@ export default function AdminGamesScreen() {
   const [batch, setBatch] = useState<BatchView | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ConsumerFootballMarket[] | null>(null);
+  const [resultTotal, setResultTotal] = useState(0);
+  const [catalogueError, setCatalogueError] = useState<string | null>(null);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [validation, setValidation] = useState<AdminSignalValidation[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [edits, setEdits] = useState<Record<string, { maxPrice: string; expiryMinutes: string }>>({});
+  const searchRequest = useRef(0);
 
   const loadBatch = async (id: string) => {
     setBatchId(id);
@@ -48,17 +53,30 @@ export default function AdminGamesScreen() {
     }
   };
 
-  const search = async () => {
-    setBusy(true);
+  const search = useCallback(async (searchQuery: string) => {
+    const request = searchRequest.current + 1;
+    searchRequest.current = request;
+    setCatalogueLoading(true);
+    setCatalogueError(null);
     try {
-      const catalogue = await admin<ConsumerFootballCatalogue>('catalogueSearch', { query: query.trim() || undefined, pageSize: 25 });
+      const catalogue = await admin<ConsumerFootballCatalogue>('catalogueSearch', { query: searchQuery.trim() || undefined, pageSize: 25 });
+      if (request !== searchRequest.current) return;
       setResults(catalogue.items);
+      setResultTotal(catalogue.total);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Catalogue search failed.');
+      if (request !== searchRequest.current) return;
+      setCatalogueError(error instanceof Error ? error.message : 'Catalogue search failed.');
     } finally {
-      setBusy(false);
+      if (request === searchRequest.current) setCatalogueLoading(false);
     }
-  };
+  }, [admin]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void search(query);
+    }, query.trim() ? SEARCH_DEBOUNCE_MS : 0);
+    return () => clearTimeout(timer);
+  }, [query, search]);
 
   const addGame = async (market: ConsumerFootballMarket) => {
     setBusy(true);
@@ -182,14 +200,23 @@ export default function AdminGamesScreen() {
         <TextInput
           accessibilityLabel="Search verified football games"
           onChangeText={setQuery}
-          onSubmitEditing={() => void search()}
-          placeholder="Search a verified football game"
+          onSubmitEditing={() => void search(query)}
+          placeholder="Search team or market"
           placeholderTextColor={theme.textMuted}
           style={[styles.input, { borderColor: theme.border, color: theme.text }]}
           value={query}
         />
-        <ActionButton label="Search" loading={busy} onPress={() => void search()} />
+        <ActionButton label={query.trim() ? 'Search' : 'Refresh'} loading={catalogueLoading} onPress={() => void search(query)} />
       </View>
+      <Text accessibilityLiveRegion="polite" style={[styles.searchStatus, { color: catalogueError ? theme.danger : theme.textMuted }]}>
+        {catalogueLoading
+          ? 'Searching games…'
+          : catalogueError
+            ? catalogueError
+            : results
+              ? `${results.length} of ${resultTotal} available outcome${resultTotal === 1 ? '' : 's'}`
+              : 'Loading upcoming games…'}
+      </Text>
       {results?.length ? results.map((market) => (
         <PressableScale accessibilityLabel={`Add ${market.eventTitle} ${market.selectionLabel}`} accessibilityRole="button" key={`${market.conditionId}:${market.tokenId}`} onPress={() => void addGame(market)}>
           <View style={[styles.row, { borderBottomColor: theme.border }]}>
@@ -286,6 +313,7 @@ const styles = StyleSheet.create({
   signalRow: { alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.md },
   smallInput: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.medium, fontSize: 14, minHeight: 44, paddingHorizontal: spacing.sm },
   searchRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  searchStatus: { fontFamily: fonts.medium, fontSize: 12, marginTop: spacing.xs },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
   sectionTitle: { fontFamily: fonts.semibold, fontSize: 17, marginBottom: spacing.sm, marginTop: spacing.lg },
 });
