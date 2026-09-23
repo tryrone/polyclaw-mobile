@@ -82,7 +82,7 @@ export type AdminFootballGameMarkets = {
   markets: { type: AdminFootballMarketType; label: string; outcomes: AdminFootballOutcome[] }[];
   asOf: string;
 };
-export type AdminFootballGames = { items: AdminFootballGame[]; total: number; asOf: string; windowEndsAt: string };
+export type AdminFootballGames = { items: AdminFootballGame[]; nextCursor: string | null; total: number; asOf: string; windowEndsAt: string };
 export type ConsumerAccount = {
   mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;

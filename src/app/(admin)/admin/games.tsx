@@ -15,6 +15,7 @@ import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 type BatchView = AdminSignalBatch & { signals: AdminSignalRow[] };
 type DateFilter = 'ALL' | 'TODAY' | 'TOMORROW';
 const SEARCH_DEBOUNCE_MS = 350;
+const GAMES_PAGE_SIZE = 20;
 
 function isoDate(offsetDays = 0) {
   const date = new Date();
@@ -39,29 +40,46 @@ export default function AdminGamesScreen() {
   const [selected, setSelected] = useState<AdminFootballGameMarkets | null>(null);
   const [catalogueError, setCatalogueError] = useState<string | null>(null);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [catalogueLoadingMore, setCatalogueLoadingMore] = useState(false);
   const [preview, setPreview] = useState<AdminBatchPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [edits, setEdits] = useState<Record<string, { maxPrice: string; expiryMinutes: string }>>({});
   const requestId = useRef(0);
+  const catalogueRequestPending = useRef(false);
+  const catalogueEndY = useRef<number | null>(null);
 
   const competitions = useMemo(() => [...new Set((games?.items ?? []).map((game) => game.competition).filter((value): value is string => Boolean(value)))].sort(), [games]);
 
-  const loadGames = useCallback(async (searchQuery: string, filter: DateFilter, selectedCompetition: string | null) => {
+  const loadGames = useCallback(async (searchQuery: string, filter: DateFilter, selectedCompetition: string | null, cursor: string | null = null) => {
+    const append = cursor !== null;
+    if (append && catalogueRequestPending.current) return;
     const request = ++requestId.current;
-    setCatalogueLoading(true);
+    catalogueRequestPending.current = true;
+    if (append) setCatalogueLoadingMore(true);
+    else setCatalogueLoading(true);
     setCatalogueError(null);
     try {
       const result = await admin<AdminFootballGames>('catalogueGames', {
         query: searchQuery.trim() || undefined,
         date: filter === 'TODAY' ? isoDate() : filter === 'TOMORROW' ? isoDate(1) : undefined,
         competition: selectedCompetition ?? undefined,
+        cursor: cursor ?? undefined,
+        pageSize: GAMES_PAGE_SIZE,
       });
-      if (request === requestId.current) setGames(result);
+      if (request === requestId.current) setGames((current) => {
+        if (!append) return result;
+        const merged = new Map([...(current?.items ?? []), ...result.items].map((game) => [game.id, game]));
+        return { ...result, items: [...merged.values()] };
+      });
     } catch (error) {
       if (request === requestId.current) setCatalogueError(error instanceof Error ? error.message : 'Could not load games.');
     } finally {
-      if (request === requestId.current) setCatalogueLoading(false);
+      if (request === requestId.current) {
+        catalogueRequestPending.current = false;
+        setCatalogueLoading(false);
+        setCatalogueLoadingMore(false);
+      }
     }
   }, [admin]);
 
@@ -69,6 +87,14 @@ export default function AdminGamesScreen() {
     const timer = setTimeout(() => void loadGames(query, dateFilter, competition), query.trim() ? SEARCH_DEBOUNCE_MS : 0);
     return () => clearTimeout(timer);
   }, [competition, dateFilter, loadGames, query]);
+
+  const loadNextGames = useCallback(() => {
+    if (!selected && games?.nextCursor) void loadGames(query, dateFilter, competition, games.nextCursor);
+  }, [competition, dateFilter, games, loadGames, query, selected]);
+
+  const handleCatalogueScroll = useCallback((offsetY: number, viewportHeight: number) => {
+    if (catalogueEndY.current !== null && offsetY + viewportHeight >= catalogueEndY.current - 240) loadNextGames();
+  }, [loadNextGames]);
 
   const loadBatch = async (id: string) => {
     setPreview(null);
@@ -203,7 +229,7 @@ export default function AdminGamesScreen() {
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
+    <Screen onScrollPosition={selected ? undefined : handleCatalogueScroll} refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
       <Header eyebrow="ADMIN" title={selected ? selected.game.eventTitle : 'Games'} />
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
 
@@ -224,8 +250,10 @@ export default function AdminGamesScreen() {
             {competitions.slice(0, 4).map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(competition === item ? null : item)} />)}
           </View>
           <ResourceState error={catalogueError} />
-          <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Loading games…' : `${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
+          <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Loading games…' : `Showing ${games?.items.length ?? 0} of ${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
           {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
+          {games?.nextCursor ? <ActionButton label="Load more games" loading={catalogueLoadingMore} onPress={loadNextGames} variant="secondary" /> : null}
+          <View onLayout={({ nativeEvent }) => { catalogueEndY.current = nativeEvent.layout.y; }} />
           {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}
         </>
       )}

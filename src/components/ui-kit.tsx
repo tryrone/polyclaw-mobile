@@ -8,12 +8,12 @@ import { haptics, PulsingDot, PressableScale, Skeleton, Staggered, Ticker } from
 
 const glassAvailable = isGlassEffectAPIAvailable();
 
-export function Screen({ children, refreshControl }: { children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps> }) {
+export function Screen({ children, refreshControl, onScrollPosition }: { children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps>; onScrollPosition?: (offsetY: number, viewportHeight: number) => void }) {
   const { theme } = usePolyClawTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const gutter = width >= layout.largeScreenBreakpoint ? spacing.xl : spacing.lg;
-  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: gutter, paddingBottom: Math.max(130, insets.bottom + 96) }]} refreshControl={refreshControl}>{children}</ScrollView></SafeAreaView>;
+  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: gutter, paddingBottom: Math.max(130, insets.bottom + 96) }]} onScroll={onScrollPosition ? ({ nativeEvent }) => onScrollPosition(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height) : undefined} refreshControl={refreshControl} scrollEventThrottle={onScrollPosition ? 100 : undefined}>{children}</ScrollView></SafeAreaView>;
 }
 
 export function Header({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {

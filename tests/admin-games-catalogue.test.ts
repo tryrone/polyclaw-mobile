@@ -5,11 +5,16 @@ import { describe, it } from 'node:test';
 const adminGames = readFileSync('src/app/(admin)/admin/games.tsx', 'utf8');
 
 describe('admin games catalogue', () => {
-  it('loads the seven-day game-first catalogue and debounces search', () => {
+  it('paginates the seven-day game-first catalogue and debounces search', () => {
     assert.match(adminGames, /useEffect/);
     assert.match(adminGames, /catalogueGames/);
     assert.match(adminGames, /void loadGames\(query, dateFilter, competition\)/);
     assert.match(adminGames, /setTimeout\([\s\S]*SEARCH_DEBOUNCE_MS/);
+    assert.match(adminGames, /pageSize: GAMES_PAGE_SIZE/);
+    assert.match(adminGames, /nextCursor/);
+    assert.match(adminGames, /onScrollPosition=\{selected \? undefined : handleCatalogueScroll\}/);
+    assert.match(adminGames, /catalogueEndY\.current/);
+    assert.match(adminGames, /new Map\([\s\S]*game\.id/);
   });
 
   it('uses the game to market to outcome flow with price confirmation and preview', () => {
