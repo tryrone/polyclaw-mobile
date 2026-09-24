@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { Lightning, Pause, Play } from 'phosphor-react-native';
 import { ActionButton } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
@@ -8,6 +8,7 @@ import type { ConsumerHomeStatus } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 import { AccountItem } from './primitives';
 import { accountStyles as styles } from './styles';
+import { autoTradeModeNotice, type AutoTradeModeResult } from './auto-trade-mode';
 
 /**
  * Auto-trade group: per-trade and daily limits, copy-trading consent, and enable/pause.
@@ -24,12 +25,12 @@ export function AutoTradeItem() {
   const [message, setMessage] = useState<string | null>(null);
   const data = resource.data;
 
-  const run = async (action: () => Promise<unknown>, note: string) => {
+  const run = async <T,>(action: () => Promise<T>, note: string | ((result: T) => string)) => {
     setBusy(true);
     setMessage(null);
     try {
-      await action();
-      setMessage(note);
+      const result = await action();
+      setMessage(typeof note === 'function' ? note(result) : note);
       await resource.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'That did not go through.');
@@ -39,9 +40,11 @@ export function AutoTradeItem() {
   };
 
   const saveLimits = async () => {
-    const per = Number(perTrade || (data?.limits.perTradeUsdc ?? 0));
-    const day = Number(daily || (data?.limits.dailyUsdc ?? 0));
+    const per = Number(perTrade || (data?.limits.requestedPerTradeUsdc ?? data?.limits.perTradeUsdc ?? 0));
+    const day = Number(daily || (data?.limits.requestedDailyUsdc ?? data?.limits.dailyUsdc ?? 0));
     if (!Number.isFinite(per) || !Number.isFinite(day) || per <= 0 || day <= 0) { setMessage('Enter a valid per-trade and daily amount.'); return; }
+    if (per < 1 || per > (data?.limits.platformMaxTradeUsdc ?? 25)) { setMessage(`Per-trade limit must be between $1 and $${data?.limits.platformMaxTradeUsdc ?? 25}.`); return; }
+    if (day < per || day > (data?.limits.platformMaxDayUsdc ?? 100)) { setMessage(`Daily limit must be at least the per-trade amount and no more than $${data?.limits.platformMaxDayUsdc ?? 100}.`); return; }
     await run(async () => {
       if (!data?.consent.fresh) await consumer('acceptCopyConsent', { version: data?.consent.currentVersion ?? 1, accepted: true });
       await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
@@ -51,6 +54,23 @@ export function AutoTradeItem() {
   const toggle = () => {
     if (data?.enabled) void run(() => consumer('pauseAutoTrade', { reason: 'Paused from Account' }), 'Auto-trade paused.');
     else void run(() => consumer('enableAutoTrade'), 'Auto-trade enabled.');
+  };
+
+  const setMode = (mode: 'PAPER' | 'LIVE') => {
+    if (!data || data.executionMode === mode) return;
+    const apply = () => void run(
+      () => consumer<AutoTradeModeResult>('configureAutoTradeMode', { mode }),
+      (result) => autoTradeModeNotice(mode, result),
+    );
+    if (mode === 'LIVE') {
+      Alert.alert(
+        'Switch to Live?',
+        'Future published signals will use real funds from your dedicated PolyClaw execution wallet, within your limits. Your linked Polymarket wallet remains read-only.',
+        [{ text: 'Cancel', style: 'cancel' }, { text: 'Use Live funds', style: 'destructive', onPress: apply }],
+      );
+      return;
+    }
+    apply();
   };
 
   const status = !data ? 'Syncing' : data.enabled ? 'On' : data.ready ? 'Off' : 'Not ready';
@@ -69,6 +89,34 @@ export function AutoTradeItem() {
           ? `Copy-trading consent v${data.consent.currentVersion} accepted.`
           : 'Accept the current copy-trading consent to turn auto-trade on.'}
       </Text>
+      <View accessibilityLabel="Trading mode" style={[hostStyles.modeControl, { backgroundColor: theme.field, borderColor: theme.border }]}>
+        {(['PAPER', 'LIVE'] as const).map((mode) => {
+          const active = data?.executionMode === mode;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active, disabled: busy || !data }}
+              disabled={busy || !data}
+              key={mode}
+              onPress={() => setMode(mode)}
+              style={[hostStyles.modeOption, active && { backgroundColor: theme.panel }]}
+            >
+              <Text style={[hostStyles.modeLabel, { color: active ? theme.text : theme.textMuted }]}>{mode === 'PAPER' ? 'Test' : 'Live'}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={[styles.footnote, { color: theme.textMuted }]}>
+        {data?.executionMode === 'LIVE'
+          ? 'Live uses real USDC from your dedicated execution wallet. The signer cannot withdraw.'
+          : 'Test uses simulated funds. No order is sent to Polymarket.'}
+      </Text>
+      {data ? (
+        <Text style={[styles.footnote, { color: theme.textMuted }]}>
+          {money(data.limits.dailyUsedUsdc)} used · {money(data.limits.dailyRemainingUsdc)} remaining · next trade up to {money(data.limits.approvedStakePreviewUsdc)}.{`\n`}
+          Platform maximum: {money(data.limits.platformMaxTradeUsdc)} per trade and {money(data.limits.platformMaxDayUsdc)} per UTC day. Resets {new Date(data.limits.resetsAt).toLocaleString()}.
+        </Text>
+      ) : null}
       {message ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{message}</Text> : null}
       <View style={hostStyles.fieldRow}>
         <View style={hostStyles.field}>
@@ -77,7 +125,7 @@ export function AutoTradeItem() {
             accessibilityLabel="Per trade amount in USDC"
             keyboardType="decimal-pad"
             onChangeText={setPerTrade}
-            placeholder={String(data?.limits.perTradeUsdc ?? 5)}
+            placeholder={String(data?.limits.requestedPerTradeUsdc ?? data?.limits.perTradeUsdc ?? 5)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
             value={perTrade}
@@ -89,7 +137,7 @@ export function AutoTradeItem() {
             accessibilityLabel="Daily amount in USDC"
             keyboardType="decimal-pad"
             onChangeText={setDaily}
-            placeholder={String(data?.limits.dailyUsdc ?? 15)}
+            placeholder={String(data?.limits.requestedDailyUsdc ?? data?.limits.dailyUsdc ?? 15)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
             value={daily}
@@ -125,4 +173,7 @@ const hostStyles = {
     paddingHorizontal: spacing.md,
     ...numeric,
   },
+  modeControl: { borderRadius: radius.sm, borderWidth: 1, flexDirection: 'row', padding: 3 },
+  modeOption: { alignItems: 'center', borderRadius: radius.sm - 2, flex: 1, minHeight: 38, justifyContent: 'center' },
+  modeLabel: { fontFamily: fonts.semibold, fontSize: 14 },
 } as const;

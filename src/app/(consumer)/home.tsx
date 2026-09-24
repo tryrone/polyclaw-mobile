@@ -56,6 +56,8 @@ export default function ConsumerHome() {
     const per = Number(perTrade);
     const day = Number(daily);
     if (!Number.isFinite(per) || !Number.isFinite(day) || per <= 0 || day <= 0) { setMessage('Enter a valid per-trade and daily amount.'); return; }
+    if (per < 1 || per > (data?.limits.platformMaxTradeUsdc ?? 25)) { setMessage(`Per-trade limit must be between $1 and $${data?.limits.platformMaxTradeUsdc ?? 25}.`); return; }
+    if (day < per || day > (data?.limits.platformMaxDayUsdc ?? 100)) { setMessage(`Daily limit must be at least the per-trade amount and no more than $${data?.limits.platformMaxDayUsdc ?? 100}.`); return; }
     await run(async () => {
       if (!data?.consent.fresh) await consumer('acceptCopyConsent', { version: data?.consent.currentVersion ?? 1, accepted: true });
       await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
@@ -64,8 +66,8 @@ export default function ConsumerHome() {
 
   const heroState = !data ? 'SYNCING'
     : !data.ready ? 'SETUP NEEDED'
-      : data.executionMode === 'PAPER' ? (data.enabled ? 'PAPER ACTIVE' : 'PAPER READY')
-        : data.enabled ? 'ACTIVE' : 'PAUSED';
+      : data.executionMode === 'PAPER' ? (data.enabled ? 'TEST ACTIVE' : 'TEST READY')
+        : data.enabled ? 'LIVE ACTIVE' : 'LIVE PAUSED';
   const heroTone = !data ? 'neutral' : !data.ready ? 'warning' : data.enabled ? 'success' : 'warning';
   const primaryLabel = data?.primaryAction === 'ENABLE' ? 'Enable auto-trade'
     : data?.primaryAction === 'PAUSE' ? 'Pause auto-trade'
@@ -103,8 +105,12 @@ export default function ConsumerHome() {
             <Text style={[styles.heroCellValue, { color: theme.background }]}>{data?.openTrades ?? 0}</Text>
           </View>
           <View style={styles.heroCell}>
-            <Text style={[styles.heroCellLabel, { color: theme.background }]}>{data?.executionMode === 'PAPER' ? 'Paper funds' : 'Wallet'}</Text>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>{data?.executionMode === 'PAPER' ? 'Test funds' : 'Live wallet'}</Text>
             <Text style={[styles.heroCellValue, { color: theme.background }]}>{money(data?.wallet.availablePusd ?? 0)}</Text>
+          </View>
+          <View style={styles.heroCell}>
+            <Text style={[styles.heroCellLabel, { color: theme.background }]}>30d PnL</Text>
+            <Text style={[styles.heroCellValue, { color: theme.background }]}>{signedMoney(performance.data?.summary.netPnlUsdc ?? 0)}</Text>
           </View>
         </View>
       </View>
@@ -124,7 +130,7 @@ export default function ConsumerHome() {
         <Card style={styles.setupCard}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Set your limits</Text>
           <Text style={[styles.copy, styles.setupCopy, { color: theme.textMuted }]}>
-            Each published signal places at most your per-trade amount, capped by the platform and your remaining day.
+            {`Choose $1–$${data.limits.platformMaxTradeUsdc} per trade and up to ${money(data.limits.platformMaxDayUsdc)} per UTC day. Existing limits never increase automatically.`}
           </Text>
           <View style={[styles.fieldRow, styles.setupFieldRow]}>
             <View style={styles.field}>
@@ -184,9 +190,11 @@ export default function ConsumerHome() {
           <View key={row.id} style={[styles.previewRow, { borderBottomColor: theme.border }]}>
             <View style={styles.flex}>
               <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.text }]}>{row.eventTitle}</Text>
-              <Text numberOfLines={1} style={[styles.previewSub, { color: theme.textMuted }]}>{row.selectionLabel} · {row.status}</Text>
+              <Text numberOfLines={1} style={[styles.previewSub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {row.result ?? row.status}</Text>
             </View>
-            <Text style={[styles.previewValue, { color: theme.text }]}>{money(row.stakeUsdc)}</Text>
+            <Text style={[styles.previewValue, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
+              {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.stakeUsdc) : signedMoney(row.netPnlUsdc)}
+            </Text>
           </View>
         ))
       ) : (
@@ -194,6 +202,10 @@ export default function ConsumerHome() {
       )}
     </Screen>
   );
+}
+
+function signedMoney(value: number) {
+  return `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
 }
 
 const styles = StyleSheet.create({

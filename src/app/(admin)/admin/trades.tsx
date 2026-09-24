@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
@@ -11,7 +11,7 @@ import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminDeliveryRow, AdminSignalBatch, AutoTradePerformance, AutoTradePerformanceRange } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
-const filters = ['ALL', 'OPEN', 'FILLED', 'FAILED', 'SKIPPED'] as const;
+const filters = ['ALL', 'OPEN', 'FILLED', 'SETTLED', 'FAILED', 'SKIPPED'] as const;
 type Filter = (typeof filters)[number];
 
 /**
@@ -24,10 +24,15 @@ export default function AdminTradesScreen() {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [range, setRange] = useState<AutoTradePerformanceRange>('1M');
   const [mode, setMode] = useState<'LIVE' | 'PAPER'>('LIVE');
+  const [query, setQuery] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [cancellingBatchId, setCancellingBatchId] = useState<string | null>(null);
   const [retryBatch, setRetryBatch] = useState<AdminSignalBatch | null>(null);
-  const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', filter === 'ALL' ? { limit: 150 } : { status: filter, limit: 150 }, 20_000);
+  const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', {
+    ...(filter === 'ALL' ? {} : { status: filter }),
+    ...(query.trim() ? { query: query.trim() } : {}),
+    limit: 150,
+  }, 20_000);
   const published = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'PUBLISHED', limit: 30 }, 20_000);
   const performance = useAdminResource<AutoTradePerformance>('tradePerformance', { range, mode }, 20_000);
   const rows = resource.data ?? [];
@@ -126,16 +131,29 @@ export default function AdminTradesScreen() {
         })}
       </View>
 
+      <TextInput
+        accessibilityLabel="Search deliveries by user"
+        autoCapitalize="none"
+        onChangeText={setQuery}
+        placeholder="Search user name or email"
+        placeholderTextColor={theme.textMuted}
+        style={[styles.search, { backgroundColor: theme.field, borderColor: theme.border, color: theme.text }]}
+        value={query}
+      />
+
       {rows.length ? rows.map((row) => (
         <View key={row.id} style={[styles.row, { borderBottomColor: theme.border }]}>
           <View style={styles.flex}>
             <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{row.eventTitle}</Text>
-            <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>{row.email} · {row.selectionLabel}</Text>
+            <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.email} · {row.selectionLabel}</Text>
+            <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>Stake {money(row.actualStakeUsdc)}{row.returnedUsdc == null ? '' : ` · returned ${money(row.returnedUsdc)}`}</Text>
             {row.failureReason ? <Text numberOfLines={2} style={[styles.failure, { color: theme.danger }]}>{row.failureReason}</Text> : null}
           </View>
           <View style={styles.right}>
-            <Text style={[styles.figure, { color: theme.text }]}>{money(row.approvedStakeUsdc)}</Text>
-            <StatusPill label={row.status} tone={['FILLED', 'SETTLED'].includes(row.status) ? 'success' : ['FAILED', 'SKIPPED'].includes(row.status) ? 'danger' : 'warning'} />
+            <Text style={[styles.figure, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
+              {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.approvedStakeUsdc) : `${row.netPnlUsdc >= 0 ? '+' : '-'}${money(Math.abs(row.netPnlUsdc))}`}
+            </Text>
+            <StatusPill label={row.result ?? row.status} tone={row.result === 'WON' ? 'success' : row.result === 'LOST' || ['FAILED', 'SKIPPED'].includes(row.status) ? 'danger' : 'neutral'} />
           </View>
         </View>
       )) : <EmptyState detail="Deliveries appear here once a batch is published." title="No deliveries" />}
@@ -163,6 +181,7 @@ const styles = StyleSheet.create({
   message: { fontFamily: fonts.medium, fontSize: 12.5, marginBottom: spacing.sm },
   right: { alignItems: 'flex-end', gap: 6 },
   row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm },
+  search: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.medium, fontSize: 14, marginBottom: spacing.sm, minHeight: 44, paddingHorizontal: spacing.md },
   sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 },
   sub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
   title: { fontFamily: fonts.semibold, fontSize: 14 },

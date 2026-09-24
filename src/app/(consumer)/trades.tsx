@@ -8,7 +8,7 @@ import { PnlChartCard } from '@/components/pnl-chart-card';
 import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { AutoTradePerformance, AutoTradePerformanceRange, ConsumerAutoTradeDetail, ConsumerAutoTradeRow } from '@/lib/types';
+import type { AutoTradePerformance, AutoTradePerformanceRange, ConsumerAutoTradeDetail, ConsumerAutoTradeRow, ConsumerTradeResult } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
 type Lens = 'pending' | 'open' | 'closed';
@@ -20,11 +20,17 @@ const lenses: { label: string; value: Lens }[] = [
   { label: 'Closed', value: 'closed' },
 ];
 
-function toneFor(status: string): Tone {
-  if (['FILLED', 'SETTLED'].includes(status)) return 'success';
-  if (['PENDING', 'RESERVED', 'DISPATCHED'].includes(status)) return 'warning';
+function toneFor(status: string, result: ConsumerTradeResult | null): Tone {
+  if (result === 'WON') return 'success';
+  if (result === 'LOST') return 'danger';
+  if (result === 'REFUNDED' || result === 'VOIDED') return 'neutral';
+  if (['PENDING', 'RESERVED', 'DISPATCHED', 'SUBMISSION_UNKNOWN'].includes(status)) return 'warning';
   if (['FAILED', 'SKIPPED', 'CANCELLED'].includes(status)) return 'danger';
   return 'neutral';
+}
+
+function signedMoney(value: number) {
+  return `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
 }
 
 /**
@@ -121,12 +127,14 @@ export default function ConsumerTradesScreen() {
                 <View style={styles.flex}>
                   <Text numberOfLines={1} style={[styles.fixture, { color: theme.text }]}>{row.eventTitle}</Text>
                   <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
-                    {row.selectionLabel} · {row.status}
+                    {row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {row.result ?? row.status}
                   </Text>
                 </View>
                 <View style={styles.right}>
-                  <Text style={[styles.figure, { color: theme.text }]}>{money(row.filledUsdc > 0 ? row.filledUsdc : row.stakeUsdc)}</Text>
-                  <StatusPill label={row.status} tone={toneFor(row.status)} />
+                  <Text numberOfLines={1} style={[styles.figure, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
+                    {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.stakeUsdc) : signedMoney(row.netPnlUsdc)}
+                  </Text>
+                  <StatusPill label={row.result ?? row.status} tone={toneFor(row.status, row.result)} />
                 </View>
               </View>
             </PressableScale>
@@ -157,10 +165,20 @@ export default function ConsumerTradesScreen() {
 
 function DetailRows({ detail }: { detail: ConsumerAutoTradeDetail }) {
   const { theme } = usePolyClawTheme();
+  const unavailable = detail.status === 'SETTLED' && detail.result == null;
   const facts: [string, string][] = [
+    ['Mode', detail.executionMode === 'PAPER' ? 'Test · simulated funds' : 'Live · funded wallet'],
     ['Maximum price', `${(detail.maxPrice * 100).toFixed(1)}¢`],
-    ['Stake', money(detail.stakeUsdc)],
-    ['Filled', money(detail.filledUsdc)],
+    ['Approved maximum', money(detail.stakeUsdc)],
+    ['Actual stake', money(detail.actualStakeUsdc)],
+    ['Average entry', detail.averageFillPrice == null ? '—' : `${(detail.averageFillPrice * 100).toFixed(1)}¢`],
+    ['Potential payout', detail.potentialPayoutUsdc == null ? '—' : money(detail.potentialPayoutUsdc)],
+    ['Returned', detail.returnedUsdc == null ? (unavailable ? 'Unavailable' : 'Pending') : money(detail.returnedUsdc)],
+    ['Fees', money(detail.feesUsdc)],
+    ['Net PnL', detail.netPnlUsdc == null ? (unavailable ? 'Unavailable' : 'Pending') : signedMoney(detail.netPnlUsdc)],
+    ['Result', detail.result ?? (unavailable ? 'Outcome unavailable' : detail.status)],
+    ['Settlement source', detail.settlementSource ?? (unavailable ? 'Unavailable' : 'Pending')],
+    ['Settled', detail.settledAt ? new Date(detail.settledAt).toLocaleString() : unavailable ? 'Unavailable' : 'Pending'],
     ['Expires', new Date(detail.expiresAt).toLocaleString()],
   ];
   return (

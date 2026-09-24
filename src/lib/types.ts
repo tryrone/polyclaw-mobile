@@ -77,7 +77,8 @@ export type ConsumerFootballMarket = {
   competition: string | null; country: string | null; homeTeam: string | null; awayTeam: string | null; liquidityUsdc: number;
 };
 export type ConsumerFootballCatalogue = { items: ConsumerFootballMarket[]; nextCursor: string | null; total: number; asOf: string };
-export type AdminFootballMarketType = 'MATCH_WINNER' | 'DOUBLE_CHANCE' | 'TOTAL_1_5' | 'TOTAL_2_5' | 'BTTS' | 'CORNERS_TOTAL';
+/** Known market categories keep friendly labels; verified pass-through markets use MARKET:<id>. */
+export type AdminFootballMarketType = string;
 export type AdminFootballGame = {
   id: string; eventTitle: string; competition: string | null; country: string | null; homeTeam: string; awayTeam: string;
   kickoff: string; marketTypes: AdminFootballMarketType[]; outcomeCount: number;
@@ -335,18 +336,30 @@ export type ConsumerHomeStatus = {
   primaryAction: PolyClawPrimaryAction;
   blockers: ConsumerReadinessBlocker[];
   wallet: { status: string; availablePusd: number; depositWalletAddress: string | null };
-  limits: { perTradeUsdc: number; dailyUsdc: number; dailyUsedUsdc: number; dailyRemainingUsdc: number; approvedStakePreviewUsdc: number };
+  limits: {
+    perTradeUsdc: number; dailyUsdc: number; requestedPerTradeUsdc: number; requestedDailyUsdc: number;
+    platformMaxTradeUsdc: number; platformMaxDayUsdc: number; dailyUsedUsdc: number; dailyRemainingUsdc: number;
+    approvedStakePreviewUsdc: number; resetsAt: string;
+  };
   openTrades: number;
-  today: { id: string; eventTitle: string; selectionLabel: string; status: string; stakeUsdc: number; createdAt: string }[];
+  today: {
+    id: string; executionMode: 'PAPER' | 'LIVE'; eventTitle: string; selectionLabel: string; status: string; stakeUsdc: number; createdAt: string;
+    result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null;
+  }[];
   consent: { currentVersion: number; acceptedVersion: number | null; fresh: boolean };
 };
 
 export type ConsumerCopyConsent = { currentVersion: number; acceptedVersion: number | null; acceptedAt: string | null; fresh: boolean };
 
+export type ConsumerTradeResult = 'OPEN' | 'WON' | 'LOST' | 'REFUNDED' | 'VOIDED';
+
 export type ConsumerAutoTradeRow = {
-  id: string; signalId: string; eventTitle: string; marketLabel: string; selectionLabel: string;
+  id: string; executionMode: 'PAPER' | 'LIVE'; signalId: string; eventTitle: string; marketLabel: string; selectionLabel: string;
   kickoff: string; maxPrice: number; stakeUsdc: number; filledUsdc: number; status: string;
   failureReason: string | null; note: string | null; positionId: string | null; createdAt: string;
+  result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null;
+  grossPnlUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null; filledShares: number;
+  averageFillPrice: number | null; potentialPayoutUsdc: number | null; settledAt: string | null; settlementSource: string | null;
 };
 
 export type ConsumerAutoTradeDetail = ConsumerAutoTradeRow & {
@@ -370,19 +383,21 @@ export type AdminSignalRow = {
   marketSnapshot: Record<string, unknown> | null;
 };
 
-export type AdminSignalValidation = { ordinal: number; valid: boolean; errors: string[]; market: boolean; acceptance: boolean; liquidityUsdc: number | null; executableLiquidityUsdc: number | null; bestAsk: number | null; verifiedAt: string | null };
+export type AdminSignalValidation = { ordinal: number; valid: boolean; errors: string[]; market: boolean; acceptance: boolean; liquidityUsdc: number | null; executableLiquidityUsdc: number | null; bestAsk: number | null; minimumOrderSize: number | null; minimumStakeUsdc: number | null; tickSize: number | null; negativeRisk: boolean | null; feeRateBps: number | null; marketParametersCheckedAt: string | null; verifiedAt: string | null };
 export type AdminBatchPreview = {
   batch: AdminSignalBatch & { signals: AdminSignalRow[] };
   validation: { rows: AdminSignalValidation[]; publishable: boolean };
   eligibleUsers: number; blockedUsers: number; blockedByCode: { code: string; count: number }[];
-  aggregateExposureUsdc: number;
+  aggregateExposureUsdc: number; testUsers: number; liveUsers: number; testExposureUsdc: number; liveExposureUsdc: number;
   signals: { ordinal: number; requestedUsdc: number; allocatedUsdc: number; executableLiquidityUsdc: number | null; bestAsk: number | null }[];
 };
 
 export type AdminDeliveryRow = {
-  id: string; batchId: string; signalId: string; userId: string; email: string; eventTitle: string;
+  id: string; executionMode: 'PAPER' | 'LIVE'; batchId: string; signalId: string; userId: string; email: string; eventTitle: string;
   marketLabel: string; selectionLabel: string; kickoff: string; approvedStakeUsdc: number; reservedUsdc: number;
   status: string; failureCode: string | null; failureReason: string | null; exchangeOrderId: string | null; createdAt: string;
+  result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null;
+  grossPnlUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null; settledAt: string | null;
 };
 
 export type AdminEligibilityRow = {
@@ -401,6 +416,12 @@ export type AdminPlatformControl = {
 export type AdminConnections = {
   adminSignalsEnabled: boolean; liveTransportEnabled: boolean; supportedJurisdictions: string[];
   executionChannelConfigured: boolean; globallyPaused: boolean;
+  executionEngine: null | {
+    adminSignalsEnabled: boolean; consumerLiveEnabled: boolean; globalEngineApproved: boolean;
+    iosApproved: boolean; androidApproved: boolean; builderApproved: boolean; builderCodeConfigured: boolean;
+    kmsConfigured: boolean; rpcConfigured: boolean; collateralConfigured: boolean; contractAllowlistConfigured: boolean;
+    remoteBuilderSignerConfigured: boolean; rawPrivateKeyAbsent: boolean;
+  };
 };
 
 export type AdminPublisher = { userId: string; email: string; name: string | null; status: string; grantedBy: string; grantReason: string; grantedAt: string };

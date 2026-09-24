@@ -14,8 +14,8 @@ type AuditRow = { id: string; subjectUserId: string; actorId: string; action: st
 
 /**
  * Settings: platform ceilings, global pause, connections and the publisher/platform audit
- * trail. Ceilings default to $5 per trade and $15 per UTC day and can never be raised above
- * those hard caps.
+ * trail. Personal limits remain user-controlled; admins can only set the platform-wide
+ * safety ceiling or lower it during an incident.
  */
 export default function AdminSettingsScreen() {
   const { theme } = usePolyClawTheme();
@@ -87,6 +87,7 @@ export default function AdminSettingsScreen() {
       <Card>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Platform ceilings</Text>
         <Text style={[styles.copy, { color: theme.textMuted }]}>Current: {data?.maxStakePerTradeUsdc ?? '—'} per trade · {data?.maxStakePerUtcDayUsdc ?? '—'} per UTC day</Text>
+        <Text style={[styles.copy, { color: theme.textMuted }]}>Users choose their own limits up to these ceilings. Hard maximum: {data?.hardCaps.maxStakePerTradeUsdc ?? 25} per trade · {data?.hardCaps.maxStakePerUtcDayUsdc ?? 100} per day.</Text>
         <View style={styles.fieldRow}>
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.textMuted }]}>PER TRADE (USDC)</Text>
@@ -118,6 +119,13 @@ export default function AdminSettingsScreen() {
         <Row label="Admin signals" value={connections.data?.adminSignalsEnabled ? 'Enabled' : 'Disabled'} theme={theme} />
         <Row label="Live transport" value={connections.data?.liveTransportEnabled ? 'Armed' : 'Not armed'} theme={theme} />
         <Row label="Execution channel" value={connections.data?.executionChannelConfigured ? 'Configured' : 'Missing'} theme={theme} />
+        <Row label="Engine status" value={connections.data?.executionEngine ? 'Reachable' : 'Unavailable'} theme={theme} />
+        <Row label="Engine admin signals" value={connections.data?.executionEngine?.adminSignalsEnabled ? 'Enabled' : 'Disabled'} theme={theme} />
+        <Row label="Global engine approval" value={connections.data?.executionEngine?.globalEngineApproved ? 'Approved' : 'Not approved'} theme={theme} />
+        <Row label="iOS approval" value={connections.data?.executionEngine?.iosApproved ? 'Approved' : 'Not approved'} theme={theme} />
+        <Row label="Builder + signer" value={connections.data?.executionEngine?.builderApproved && connections.data.executionEngine.builderCodeConfigured && connections.data.executionEngine.remoteBuilderSignerConfigured ? 'Ready' : 'Incomplete'} theme={theme} />
+        <Row label="KMS + chain" value={connections.data?.executionEngine?.kmsConfigured && connections.data.executionEngine.rpcConfigured && connections.data.executionEngine.collateralConfigured && connections.data.executionEngine.contractAllowlistConfigured ? 'Ready' : 'Incomplete'} theme={theme} />
+        <Row label="Raw private key" value={connections.data?.executionEngine?.rawPrivateKeyAbsent ? 'Absent' : 'Unsafe configuration'} theme={theme} />
         <Row label="Supported jurisdictions" value={connections.data?.supportedJurisdictions.length ? connections.data.supportedJurisdictions.join(', ') : 'Blocked until configured'} theme={theme} />
       </Card>
 

@@ -9,4 +9,13 @@ describe('consumer trade detail', () => {
     assert.match(tradeScreen, /key=\{`\$\{fill\.occurredAt\}:\$\{index\}`\}/);
     assert.match(tradeScreen, /key=\{`\$\{step\.label\}:\$\{step\.at\}`\}/);
   });
+
+  it('separates execution status from financial result and renders settlement accounting', () => {
+    assert.match(tradeScreen, /row\.result \?\? row\.status/);
+    assert.match(tradeScreen, /\['Actual stake', money\(detail\.actualStakeUsdc\)\]/);
+    assert.match(tradeScreen, /\['Returned', detail\.returnedUsdc/);
+    assert.match(tradeScreen, /\['Fees', money\(detail\.feesUsdc\)\]/);
+    assert.match(tradeScreen, /\['Net PnL', detail\.netPnlUsdc/);
+    assert.doesNotMatch(tradeScreen, /\['FILLED', 'SETTLED'\]\.includes\(status\)/);
+  });
 });
