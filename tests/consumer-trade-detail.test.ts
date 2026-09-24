@@ -18,4 +18,9 @@ describe('consumer trade detail', () => {
     assert.match(tradeScreen, /\['Net PnL', detail\.netPnlUsdc/);
     assert.doesNotMatch(tradeScreen, /\['FILLED', 'SETTLED'\]\.includes\(status\)/);
   });
+
+  it('opens the verified Polymarket market URL from trade detail', () => {
+    assert.match(tradeScreen, /label="Open on Polymarket"/);
+    assert.match(tradeScreen, /Linking\.openURL\(detail\.polymarketUrl!\)/);
+  });
 });

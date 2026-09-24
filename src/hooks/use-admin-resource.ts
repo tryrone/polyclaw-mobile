@@ -3,14 +3,14 @@ import { AppState } from 'react-native';
 import { useAuth } from '@/auth/provider';
 import type { AdminProcedure } from '@/lib/api';
 
-export function useAdminResource<T>(procedure: AdminProcedure, input?: Record<string, unknown>, intervalMs = 30_000) {
+export function useAdminResource<T>(procedure: AdminProcedure, input?: Record<string, unknown>, intervalMs = 30_000, enabled = true) {
   const { admin, state } = useAuth();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const serializedInput = JSON.stringify(input ?? {});
   const refresh = useCallback(async () => {
-    if (state !== 'authenticated') return;
+    if (!enabled || state !== 'authenticated') return;
     try {
       setData(await admin<T>(procedure, JSON.parse(serializedInput)));
       setError(null);
@@ -19,12 +19,13 @@ export function useAdminResource<T>(procedure: AdminProcedure, input?: Record<st
     } finally {
       setLoading(false);
     }
-  }, [admin, procedure, serializedInput, state]);
+  }, [admin, enabled, procedure, serializedInput, state]);
   useEffect(() => {
+    if (!enabled) return;
     void Promise.resolve().then(refresh);
     const timer = setInterval(refresh, intervalMs);
     const subscription = AppState.addEventListener('change', (next) => { if (next === 'active') void refresh(); });
     return () => { clearInterval(timer); subscription.remove(); };
-  }, [intervalMs, refresh]);
+  }, [enabled, intervalMs, refresh]);
   return { data, error, loading, refresh, setData };
 }

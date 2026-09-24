@@ -1,6 +1,6 @@
 import { SoccerBall } from 'phosphor-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { ConsumerTradesSkeleton } from '@/components/page-skeletons';
@@ -31,6 +31,11 @@ function toneFor(status: string, result: ConsumerTradeResult | null): Tone {
 
 function signedMoney(value: number) {
   return `${value >= 0 ? '+' : '-'}${money(Math.abs(value))}`;
+}
+
+function tradeStatus(row: Pick<ConsumerAutoTradeRow, 'result' | 'status' | 'settlementState'>) {
+  if (row.settlementState === 'AWAITING_POLYMARKET') return 'Awaiting Polymarket';
+  return row.result ?? row.status;
 }
 
 /**
@@ -127,14 +132,14 @@ export default function ConsumerTradesScreen() {
                 <View style={styles.flex}>
                   <Text numberOfLines={1} style={[styles.fixture, { color: theme.text }]}>{row.eventTitle}</Text>
                   <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
-                    {row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {row.result ?? row.status}
+                    {row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {tradeStatus(row)}
                   </Text>
                 </View>
                 <View style={styles.right}>
                   <Text numberOfLines={1} style={[styles.figure, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
                     {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.stakeUsdc) : signedMoney(row.netPnlUsdc)}
                   </Text>
-                  <StatusPill label={row.result ?? row.status} tone={toneFor(row.status, row.result)} />
+                  <StatusPill label={tradeStatus(row)} tone={row.settlementState === 'AWAITING_POLYMARKET' ? 'warning' : toneFor(row.status, row.result)} />
                 </View>
               </View>
             </PressableScale>
@@ -142,6 +147,11 @@ export default function ConsumerTradesScreen() {
             {detail?.id === row.id ? (
               <Card>
                 <DetailRows detail={detail} />
+                {detail.polymarketUrl ? <ActionButton
+                  label="Open on Polymarket"
+                  onPress={() => void Linking.openURL(detail.polymarketUrl!)}
+                  variant="secondary"
+                /> : null}
                 <ActionButton
                   disabled={!detail.canClose}
                   label={detail.canClose ? 'Close position' : 'No open position'}
@@ -172,12 +182,12 @@ function DetailRows({ detail }: { detail: ConsumerAutoTradeDetail }) {
     ['Approved maximum', money(detail.stakeUsdc)],
     ['Actual stake', money(detail.actualStakeUsdc)],
     ['Average entry', detail.averageFillPrice == null ? '—' : `${(detail.averageFillPrice * 100).toFixed(1)}¢`],
-    ['Potential payout', detail.potentialPayoutUsdc == null ? '—' : money(detail.potentialPayoutUsdc)],
+    ['Potential return', detail.potentialPayoutUsdc == null ? '—' : `${money(detail.potentialPayoutUsdc)} · not spendable`],
     ['Returned', detail.returnedUsdc == null ? (unavailable ? 'Unavailable' : 'Pending') : money(detail.returnedUsdc)],
     ['Fees', money(detail.feesUsdc)],
     ['Net PnL', detail.netPnlUsdc == null ? (unavailable ? 'Unavailable' : 'Pending') : signedMoney(detail.netPnlUsdc)],
-    ['Result', detail.result ?? (unavailable ? 'Outcome unavailable' : detail.status)],
-    ['Settlement source', detail.settlementSource ?? (unavailable ? 'Unavailable' : 'Pending')],
+    ['Result', detail.settlementState === 'AWAITING_POLYMARKET' ? 'Awaiting Polymarket' : detail.result ?? (unavailable ? 'Outcome unavailable' : detail.status)],
+    ['Settlement source', detail.settlementSource ?? (unavailable ? 'Unavailable' : detail.settlementState === 'AWAITING_POLYMARKET' ? 'Polymarket · pending finalization' : 'Pending')],
     ['Settled', detail.settledAt ? new Date(detail.settledAt).toLocaleString() : unavailable ? 'Unavailable' : 'Pending'],
     ['Expires', new Date(detail.expiresAt).toLocaleString()],
   ];

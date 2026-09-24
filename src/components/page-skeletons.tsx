@@ -97,17 +97,13 @@ export function ConsumerAccountSkeleton() {
   );
 }
 
-export function AdminGamesSkeleton() {
+export function AdminGamesListSkeleton() {
   return (
-    <LoadingSurface label="Loading game catalogue">
-      <Skeleton radius={radius.sm} style={styles.search} />
-      <FilterRow count={4} />
+    <LoadingSurface label="Loading games">
       <Line height={10} width="32%" />
       <ListRow status={false} />
       <ListRow status={false} />
       <ListRow status={false} />
-      <SectionStub width="20%" />
-      <Skeleton radius={radius.md} style={styles.emptyCard} />
     </LoadingSurface>
   );
 }
@@ -161,7 +157,6 @@ const styles = StyleSheet.create({
   action: { height: 50, width: '100%' },
   avatar: { height: 56, width: 56 },
   card: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, gap: spacing.md, padding: spacing.lg },
-  emptyCard: { height: 128, width: '100%' },
   filter: { flex: 1, height: 44, minWidth: 62 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   group: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },

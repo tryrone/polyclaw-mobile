@@ -120,6 +120,8 @@ export default function AdminSettingsScreen() {
         <Row label="Live transport" value={connections.data?.liveTransportEnabled ? 'Armed' : 'Not armed'} theme={theme} />
         <Row label="Execution channel" value={connections.data?.executionChannelConfigured ? 'Configured' : 'Missing'} theme={theme} />
         <Row label="Engine status" value={connections.data?.executionEngine ? 'Reachable' : 'Unavailable'} theme={theme} />
+        <Row label="Admin-signal readiness" value={connections.data?.executionEngine?.adminSignalReady ? 'Ready' : 'Blocked'} theme={theme} />
+        <Row label="Funded canary" value={connections.data?.executionEngine?.canaryEnabled ? 'Enabled' : 'Disabled'} theme={theme} />
         <Row label="Engine admin signals" value={connections.data?.executionEngine?.adminSignalsEnabled ? 'Enabled' : 'Disabled'} theme={theme} />
         <Row label="Global engine approval" value={connections.data?.executionEngine?.globalEngineApproved ? 'Approved' : 'Not approved'} theme={theme} />
         <Row label="iOS approval" value={connections.data?.executionEngine?.iosApproved ? 'Approved' : 'Not approved'} theme={theme} />

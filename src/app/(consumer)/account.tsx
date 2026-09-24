@@ -40,8 +40,8 @@ export default function ConsumerAccountScreen() {
       <SettingsGroup title="Account">
         <AutoTradeItem />
         {controller.subscription.visible ? <SubscriptionItem controller={controller} /> : null}
-        <WalletItem controller={controller} />
-        <SignerItem controller={controller} />
+        {controller.wallet.account?.liveCanaryAllowed ? <WalletItem controller={controller} /> : null}
+        {controller.wallet.account?.liveCanaryAllowed ? <SignerItem controller={controller} /> : null}
       </SettingsGroup>
 
       <SettingsGroup title="Preferences">

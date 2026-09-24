@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
@@ -147,13 +147,14 @@ export default function AdminTradesScreen() {
             <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{row.eventTitle}</Text>
             <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.email} · {row.selectionLabel}</Text>
             <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>Stake {money(row.actualStakeUsdc)}{row.returnedUsdc == null ? '' : ` · returned ${money(row.returnedUsdc)}`}</Text>
+            {row.settlementState === 'AWAITING_POLYMARKET' && row.polymarketUrl ? <PressableScale accessibilityLabel={`Open ${row.eventTitle} on Polymarket`} accessibilityRole="link" onPress={() => void Linking.openURL(row.polymarketUrl!)}><Text style={[styles.marketLink, { color: theme.accent }]}>Open market</Text></PressableScale> : null}
             {row.failureReason ? <Text numberOfLines={2} style={[styles.failure, { color: theme.danger }]}>{row.failureReason}</Text> : null}
           </View>
           <View style={styles.right}>
             <Text style={[styles.figure, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
               {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.approvedStakeUsdc) : `${row.netPnlUsdc >= 0 ? '+' : '-'}${money(Math.abs(row.netPnlUsdc))}`}
             </Text>
-            <StatusPill label={row.result ?? row.status} tone={row.result === 'WON' ? 'success' : row.result === 'LOST' || ['FAILED', 'SKIPPED'].includes(row.status) ? 'danger' : 'neutral'} />
+            <StatusPill label={row.settlementState === 'AWAITING_POLYMARKET' ? 'Awaiting Polymarket' : row.result ?? row.status} tone={row.settlementState === 'AWAITING_POLYMARKET' ? 'warning' : row.result === 'WON' ? 'success' : row.result === 'LOST' || ['FAILED', 'SKIPPED'].includes(row.status) ? 'danger' : 'neutral'} />
           </View>
         </View>
       )) : <EmptyState detail="Deliveries appear here once a batch is published." title="No deliveries" />}
@@ -179,6 +180,7 @@ const styles = StyleSheet.create({
   filterText: { fontFamily: fonts.bold, fontSize: 12 },
   flex: { flex: 1, minWidth: 0 },
   message: { fontFamily: fonts.medium, fontSize: 12.5, marginBottom: spacing.sm },
+  marketLink: { fontFamily: fonts.semibold, fontSize: 12, marginTop: 4 },
   right: { alignItems: 'flex-end', gap: 6 },
   row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm },
   search: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.medium, fontSize: 14, marginBottom: spacing.sm, minHeight: 44, paddingHorizontal: spacing.md },

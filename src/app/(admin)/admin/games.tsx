@@ -6,7 +6,7 @@ import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-
 
 import { useAuth } from '@/auth/provider';
 import { PressableScale } from '@/components/motion';
-import { AdminGamesSkeleton } from '@/components/page-skeletons';
+import { AdminGamesListSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminBatchPreview, AdminFootballGame, AdminFootballGameMarkets, AdminFootballGames, AdminFootballOutcome, AdminSignalBatch, AdminSignalRow } from '@/lib/types';
@@ -31,7 +31,6 @@ function cents(value: number | null) {
 export default function AdminGamesScreen() {
   const { theme } = usePolyClawTheme();
   const { admin } = useAuth();
-  const drafts = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'DRAFT' }, 30_000);
   const [batch, setBatch] = useState<BatchView | null>(null);
   const [query, setQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
@@ -41,6 +40,7 @@ export default function AdminGamesScreen() {
   const [catalogueError, setCatalogueError] = useState<string | null>(null);
   const [catalogueLoading, setCatalogueLoading] = useState(false);
   const [catalogueLoadingMore, setCatalogueLoadingMore] = useState(false);
+  const [catalogueHydrated, setCatalogueHydrated] = useState(false);
   const [preview, setPreview] = useState<AdminBatchPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,6 +48,7 @@ export default function AdminGamesScreen() {
   const requestId = useRef(0);
   const catalogueRequestPending = useRef(false);
   const catalogueEndY = useRef<number | null>(null);
+  const drafts = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'DRAFT' }, 30_000, games !== null || catalogueError !== null);
 
   const competitions = useMemo(() => [...new Set((games?.items ?? []).map((game) => game.competition).filter((value): value is string => Boolean(value)))].sort(), [games]);
 
@@ -84,9 +85,15 @@ export default function AdminGamesScreen() {
   }, [admin]);
 
   useEffect(() => {
+    const frame = requestAnimationFrame(() => setCatalogueHydrated(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!catalogueHydrated) return;
     const timer = setTimeout(() => void loadGames(query, dateFilter, competition), query.trim() ? SEARCH_DEBOUNCE_MS : 0);
     return () => clearTimeout(timer);
-  }, [competition, dateFilter, loadGames, query]);
+  }, [catalogueHydrated, competition, dateFilter, loadGames, query]);
 
   const loadNextGames = useCallback(() => {
     if (!selected && games?.nextCursor) void loadGames(query, dateFilter, competition, games.nextCursor);
@@ -131,7 +138,7 @@ export default function AdminGamesScreen() {
         selectionLabel: outcome.selectionLabel, competition: outcome.competition, country: outcome.country,
         homeTeam: outcome.homeTeam, awayTeam: outcome.awayTeam, kickoff: outcome.kickoff,
         maxPrice: defaultPrice, expiresAt: new Date(new Date(outcome.kickoff).getTime() - 10 * 60_000).toISOString(), note: null,
-        marketSnapshot: { marketType: outcome.marketType, currentPrice: outcome.currentPrice, priceConfirmed: false },
+        marketSnapshot: { marketType: outcome.marketType, currentPrice: outcome.currentPrice, polymarketUrl: outcome.polymarketUrl, priceConfirmed: false },
       } });
       await loadBatch(batchId);
       setSelected(null);
@@ -142,7 +149,7 @@ export default function AdminGamesScreen() {
 
   const editFor = (signal: AdminSignalRow) => edits[signal.id] ?? {
     maxPrice: String(Math.round(signal.maxPrice * 100)),
-    expiryMinutes: String(Math.max(1, Math.round((new Date(signal.kickoff).getTime() - new Date(signal.expiresAt).getTime()) / 60_000))),
+    expiryMinutes: String(Math.max(10, Math.round((new Date(signal.kickoff).getTime() - new Date(signal.expiresAt).getTime()) / 60_000))),
   };
 
   const saveSignal = async (signal: AdminSignalRow) => {
@@ -151,8 +158,9 @@ export default function AdminGamesScreen() {
     const price = Number(edit.maxPrice);
     const expiryMinutes = Number(edit.expiryMinutes);
     const expiresAt = new Date(new Date(signal.kickoff).getTime() - expiryMinutes * 60_000);
-    if (!Number.isFinite(price) || price < 1 || price > 99 || !Number.isFinite(expiryMinutes) || expiryMinutes < 1 || expiresAt <= new Date()) {
-      setMessage('Use a 1–99¢ maximum price and close at least one minute before kickoff.');
+    const selectedPrice = typeof signal.marketSnapshot?.currentPrice === 'number' ? signal.marketSnapshot.currentPrice : null;
+    if (!Number.isFinite(price) || price < 1 || price > 99 || selectedPrice == null || price / 100 > selectedPrice + 0.02000001 || !Number.isFinite(expiryMinutes) || expiryMinutes < 10 || expiresAt <= new Date()) {
+      setMessage('Use a maximum no more than 2¢ above the selected price and close at least 10 minutes before kickoff.');
       return;
     }
     setBusy(true);
@@ -219,15 +227,6 @@ export default function AdminGamesScreen() {
     ]);
   };
 
-  const initialLoading = !games && !selected && (catalogueLoading || drafts.loading);
-
-  if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
-      <Header eyebrow="ADMIN" title="Games" />
-      <ResourceState loading loadingFallback={<AdminGamesSkeleton />} />
-    </Screen>
-  );
-
   return (
     <Screen onScrollPosition={selected ? undefined : handleCatalogueScroll} refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
       <Header eyebrow="ADMIN" title={selected ? selected.game.eventTitle : 'Games'} />
@@ -249,12 +248,14 @@ export default function AdminGamesScreen() {
             {(['ALL', 'TODAY', 'TOMORROW'] as const).map((filter) => <FilterChip active={dateFilter === filter} key={filter} label={filter === 'ALL' ? '7 days' : filter === 'TODAY' ? 'Today' : 'Tomorrow'} onPress={() => setDateFilter(filter)} />)}
             {competitions.slice(0, 4).map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(competition === item ? null : item)} />)}
           </View>
-          <ResourceState error={catalogueError} />
-          <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Loading games…' : `Showing ${games?.items.length ?? 0} of ${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
-          {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
-          {games?.nextCursor ? <ActionButton label="Load more games" loading={catalogueLoadingMore} onPress={loadNextGames} variant="secondary" /> : null}
-          <View onLayout={({ nativeEvent }) => { catalogueEndY.current = nativeEvent.layout.y; }} />
-          {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}
+          {!catalogueHydrated || (!games && catalogueLoading) ? <AdminGamesListSkeleton /> : <>
+            <ResourceState error={catalogueError} />
+            <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Refreshing games…' : `Showing ${games?.items.length ?? 0} of ${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
+            {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
+            {games?.nextCursor ? <ActionButton label="Load more games" loading={catalogueLoadingMore} onPress={loadNextGames} variant="secondary" /> : null}
+            <View onLayout={({ nativeEvent }) => { catalogueEndY.current = nativeEvent.layout.y; }} />
+            {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}
+          </>}
         </>
       )}
 

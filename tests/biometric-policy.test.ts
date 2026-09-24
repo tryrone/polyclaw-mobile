@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
-import { nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '../src/auth/biometric-policy';
+import { biometricLoginEnabled, nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '../src/auth/biometric-policy';
 
 const authProvider = readFileSync('src/auth/provider.tsx', 'utf8');
 
 describe('PolyClaw biometric policy', () => {
+  it('can disable only the recurring Face login without weakening explicit transaction authentication', () => {
+    assert.equal(biometricLoginEnabled({ EXPO_PUBLIC_POLYCLAW_FACE_LOGIN_ENABLED: 'false' }), false);
+    assert.equal(biometricLoginEnabled({ EXPO_PUBLIC_POLYCLAW_FACE_LOGIN_ENABLED: 'true' }), true);
+    assert.equal(biometricLoginEnabled({}), true);
+  });
+
   it('locks after 60 seconds but not at 59 seconds', () => {
     assert.equal(shouldRelockAfterBackground(1_000, 60_000, true), false);
     assert.equal(shouldRelockAfterBackground(1_000, 62_000, true), true);
