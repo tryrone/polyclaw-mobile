@@ -1,5 +1,9 @@
 export const BIOMETRIC_BACKGROUND_LOCK_MS = 60_000;
 
+export function biometricLoginEnabled(environment: Record<string, string | undefined> = process.env) {
+  return environment.EXPO_PUBLIC_POLYCLAW_FACE_LOGIN_ENABLED !== 'false';
+}
+
 export function nextLockStateAfterSessionSave(input: {
   hasSession: boolean;
   recoveryPending: boolean;
@@ -19,5 +23,5 @@ export function requiresMandatoryBiometric(input: { role: 'USER' | 'ADMIN'; pilo
 }
 
 export function recoveryBlocksProcedure(procedure: string) {
-  return new Set(['grantPilotAccess', 'revokePilotAccess', 'addPilotMembership', 'revokePilotMembership', 'approveLiveAccount', 'denyLiveAccount', 'revokeLiveAccount', 'releaseCanaryIntent', 'resetCanaryAttempt', 'renewSigner', 'authorizeBotSigner', 'prepareLiveActivation', 'enableLiveBot']).has(procedure);
+  return new Set(['grantPilotAccess', 'revokePilotAccess', 'addPilotMembership', 'revokePilotMembership', 'approveLiveAccount', 'denyLiveAccount', 'revokeLiveAccount', 'releaseCanaryIntent', 'resetCanaryAttempt', 'renewSigner', 'authorizeBotSigner', 'prepareLiveActivation', 'enableLiveBot', 'configureAutoTradeMode']).has(procedure);
 }

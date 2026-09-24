@@ -5,7 +5,7 @@ import { adminRequest, consumerRequest, loginUser, loginWithApple, logoutUser, o
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
 import { signInWithGoogle as googleSignIn } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
-import { nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
+import { biometricLoginEnabled, nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
 
 type AuthState = 'hydrating' | 'anonymous' | 'authenticated';
 type AuthValue = {
@@ -14,6 +14,7 @@ type AuthValue = {
   biometricSupported: boolean;
   biometricEnabled: boolean;
   biometricRequired: boolean;
+  faceLoginEnabled: boolean;
   locked: boolean;
   recoveryMode: boolean;
   securityResolved: boolean;
@@ -34,6 +35,7 @@ type AuthValue = {
 const Context = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const faceLoginEnabled = biometricLoginEnabled();
   const [state, setState] = useState<AuthState>('hydrating');
   const [session, setSession] = useState<AuthSession | null>(null);
   const [biometricSupported, setBiometricSupported] = useState(false);
@@ -184,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [freshSession, save]);
 
-  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin }), [state, session, biometricSupported, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin]);
+  const value = useMemo(() => ({ state, session, biometricSupported, biometricEnabled, biometricRequired, faceLoginEnabled, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin }), [state, session, biometricSupported, biometricEnabled, biometricRequired, faceLoginEnabled, locked, recoveryMode, securityResolved, setBiometricEnabled, unlockWithBiometric, markUnlocked, beginRecoveryReauthentication, signIn, signUp, signInWithApple, signInWithGoogle, signOut, request, consumer, admin]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

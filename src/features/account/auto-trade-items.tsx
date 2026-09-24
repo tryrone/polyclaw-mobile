@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { Lightning, Pause, Play } from 'phosphor-react-native';
 import { ActionButton } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
@@ -63,10 +64,19 @@ export function AutoTradeItem() {
       (result) => autoTradeModeNotice(mode, result),
     );
     if (mode === 'LIVE') {
+      if (!data.liveAccess.available) {
+        setMessage(data.liveAccess.reason ?? 'Live trading is not available for this account yet.');
+        return;
+      }
       Alert.alert(
         'Switch to Live?',
         'Future published signals will use real funds from your dedicated PolyClaw execution wallet, within your limits. Your linked Polymarket wallet remains read-only.',
-        [{ text: 'Cancel', style: 'cancel' }, { text: 'Use Live funds', style: 'destructive', onPress: apply }],
+        [{ text: 'Cancel', style: 'cancel' }, { text: 'Use Live funds', style: 'destructive', onPress: () => void (async () => {
+          const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
+          if (!hardware || !enrolled) { setMessage('Set up Face ID, Touch ID, or device authentication before using Live funds.'); return; }
+          const authenticated = await LocalAuthentication.authenticateAsync({ promptMessage: 'Switch PolyClaw to Live', cancelLabel: 'Cancel', disableDeviceFallback: false });
+          if (authenticated.success) apply();
+        })() }],
       );
       return;
     }
@@ -92,16 +102,17 @@ export function AutoTradeItem() {
       <View accessibilityLabel="Trading mode" style={[hostStyles.modeControl, { backgroundColor: theme.field, borderColor: theme.border }]}>
         {(['PAPER', 'LIVE'] as const).map((mode) => {
           const active = data?.executionMode === mode;
+          const unavailable = mode === 'LIVE' && data?.liveAccess.available === false;
           return (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ selected: active, disabled: busy || !data }}
-              disabled={busy || !data}
+              accessibilityState={{ selected: active, disabled: busy || !data || unavailable }}
+              disabled={busy || !data || unavailable}
               key={mode}
               onPress={() => setMode(mode)}
               style={[hostStyles.modeOption, active && { backgroundColor: theme.panel }]}
             >
-              <Text style={[hostStyles.modeLabel, { color: active ? theme.text : theme.textMuted }]}>{mode === 'PAPER' ? 'Test' : 'Live'}</Text>
+              <Text style={[hostStyles.modeLabel, { color: active ? theme.text : theme.textMuted }]}>{mode === 'PAPER' ? 'Test' : unavailable ? 'Live · soon' : 'Live'}</Text>
             </Pressable>
           );
         })}
@@ -111,6 +122,7 @@ export function AutoTradeItem() {
           ? 'Live uses real USDC from your dedicated execution wallet. The signer cannot withdraw.'
           : 'Test uses simulated funds. No order is sent to Polymarket.'}
       </Text>
+      {!data?.liveAccess.available ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{data?.liveAccess.reason ?? 'Live trading is not available for this account yet.'}</Text> : null}
       {data ? (
         <Text style={[styles.footnote, { color: theme.textMuted }]}>
           {money(data.limits.dailyUsedUsdc)} used · {money(data.limits.dailyRemainingUsdc)} remaining · next trade up to {money(data.limits.approvedStakePreviewUsdc)}.{`\n`}

@@ -5,6 +5,15 @@ import { describe, it } from 'node:test';
 const adminGames = readFileSync('src/app/(admin)/admin/games.tsx', 'utf8');
 
 describe('admin games catalogue', () => {
+  it('renders the admin shell before progressively loading catalogue data', () => {
+    assert.match(adminGames, /catalogueHydrated/);
+    assert.match(adminGames, /requestAnimationFrame\(\(\) => setCatalogueHydrated\(true\)\)/);
+    assert.match(adminGames, /useAdminResource<AdminSignalBatch\[]>\([\s\S]*games !== null \|\| catalogueError !== null/);
+    assert.match(adminGames, /!catalogueHydrated \|\| \(!games && catalogueLoading\)/);
+    assert.match(adminGames, /AdminGamesListSkeleton/);
+    assert.doesNotMatch(adminGames, /catalogueLoading \|\| drafts\.loading/);
+  });
+
   it('paginates the seven-day game-first catalogue and debounces search', () => {
     assert.match(adminGames, /useEffect/);
     assert.match(adminGames, /catalogueGames/);
@@ -22,6 +31,7 @@ describe('admin games catalogue', () => {
     assert.match(adminGames, /currentPrice/);
     assert.match(adminGames, /Confirm price/);
     assert.match(adminGames, /previewBatch/);
+    assert.match(adminGames, /polymarketUrl: outcome\.polymarketUrl/);
   });
 
   it('requires device authentication and explicit confirmation before publishing', () => {

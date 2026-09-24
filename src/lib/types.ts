@@ -88,6 +88,7 @@ export type AdminFootballOutcome = {
   eventTitle: string; marketType: AdminFootballMarketType; marketLabel: string; selectionLabel: string; kickoff: string;
   active: boolean; closed: boolean; acceptingOrders: boolean; competition: string | null; country: string | null;
   homeTeam: string; awayTeam: string; liquidityUsdc: number; currentPrice: number | null;
+  polymarketUrl: string | null;
 };
 export type AdminFootballGameMarkets = {
   game: AdminFootballGame;
@@ -97,6 +98,7 @@ export type AdminFootballGameMarkets = {
 export type AdminFootballGames = { items: AdminFootballGame[]; nextCursor: string | null; total: number; asOf: string; windowEndsAt: string };
 export type ConsumerAccount = {
   mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
+  liveCanaryAllowed: boolean;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
   notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
   approval: { paperDays: number; settledBotPositions: number; globalEngineApproved: boolean; platformApproved: boolean; reviewReady: boolean; reviewMissingReasons: string[]; ownerWithdrawalComplete: boolean; manualLiveEligible: boolean; botLiveEligible: boolean; manualReasons: string[]; botReasons: string[] };
@@ -336,6 +338,7 @@ export type ConsumerHomeStatus = {
   primaryAction: PolyClawPrimaryAction;
   blockers: ConsumerReadinessBlocker[];
   wallet: { status: string; availablePusd: number; depositWalletAddress: string | null };
+  liveAccess: { available: boolean; reason: string | null };
   limits: {
     perTradeUsdc: number; dailyUsdc: number; requestedPerTradeUsdc: number; requestedDailyUsdc: number;
     platformMaxTradeUsdc: number; platformMaxDayUsdc: number; dailyUsedUsdc: number; dailyRemainingUsdc: number;
@@ -360,6 +363,7 @@ export type ConsumerAutoTradeRow = {
   result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null;
   grossPnlUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null; filledShares: number;
   averageFillPrice: number | null; potentialPayoutUsdc: number | null; settledAt: string | null; settlementSource: string | null;
+  settlementState: 'PENDING' | 'AWAITING_POLYMARKET' | 'SETTLED'; polymarketUrl: string | null;
 };
 
 export type ConsumerAutoTradeDetail = ConsumerAutoTradeRow & {
@@ -398,6 +402,8 @@ export type AdminDeliveryRow = {
   status: string; failureCode: string | null; failureReason: string | null; exchangeOrderId: string | null; createdAt: string;
   result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null;
   grossPnlUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null; settledAt: string | null;
+  settlementState: 'PENDING' | 'AWAITING_POLYMARKET' | 'SETTLED';
+  polymarketUrl: string | null;
 };
 
 export type AdminEligibilityRow = {
@@ -417,7 +423,7 @@ export type AdminConnections = {
   adminSignalsEnabled: boolean; liveTransportEnabled: boolean; supportedJurisdictions: string[];
   executionChannelConfigured: boolean; globallyPaused: boolean;
   executionEngine: null | {
-    adminSignalsEnabled: boolean; consumerLiveEnabled: boolean; globalEngineApproved: boolean;
+    adminSignalReady: boolean; adminSignalsEnabled: boolean; canaryEnabled: boolean; consumerLiveEnabled: boolean; globalEngineApproved: boolean;
     iosApproved: boolean; androidApproved: boolean; builderApproved: boolean; builderCodeConfigured: boolean;
     kmsConfigured: boolean; rpcConfigured: boolean; collateralConfigured: boolean; contractAllowlistConfigured: boolean;
     remoteBuilderSignerConfigured: boolean; rawPrivateKeyAbsent: boolean;

@@ -21,7 +21,7 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_POLYCLAW_ACCESS_MODE": "PILOT",
-        "EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED": "false"
+        "EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED": "true"
       }
     }
   },

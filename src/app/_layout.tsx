@@ -22,7 +22,7 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
 
 function AuthenticatedStack() {
-  const { state, session, biometricEnabled, biometricRequired, locked, recoveryMode, securityResolved, markUnlocked } = useAuth();
+  const { state, session, biometricEnabled, biometricRequired, faceLoginEnabled, locked, recoveryMode, securityResolved, markUnlocked } = useAuth();
   const { theme } = usePolyClawTheme();
   const router = useRouter();
   const pathname = usePathname();
@@ -41,7 +41,7 @@ function AuthenticatedStack() {
   }, [pathname, router, session?.user.role, state]);
 
   if (state === 'authenticated' && !securityResolved) return null;
-  const needsUnlock = state === 'authenticated' && !recoveryMode && (biometricRequired || biometricEnabled) && locked;
+  const needsUnlock = faceLoginEnabled && state === 'authenticated' && !recoveryMode && (biometricRequired || biometricEnabled) && locked;
   return (
     <>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
