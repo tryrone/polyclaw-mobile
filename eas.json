@@ -21,7 +21,10 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_POLYCLAW_ACCESS_MODE": "PILOT",
-        "EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED": "true"
+        "EXPO_PUBLIC_POLYCLAW_WALLET_ENABLED": "true",
+        "EXPO_PUBLIC_PRIVY_APP_ID": "cmuh0lwya01ak0difd7fjva5z",
+        "EXPO_PUBLIC_PRIVY_CLIENT_ID": "client-WY6dy49cp819ifUQQUGztsYxE65gzafQ1xGf6WBofMJjA",
+        "EXPO_PUBLIC_PRIVY_PASSKEY_DOMAIN": "betsclaw.win"
       }
     }
   },
