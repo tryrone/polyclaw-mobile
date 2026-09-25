@@ -8,6 +8,7 @@ import { PnlChartCard } from '@/components/pnl-chart-card';
 import { PressableScale } from '@/components/motion';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
+import { tradeSelectionLabel } from '@/lib/markets';
 import type { AutoTradePerformance, AutoTradePerformanceRange, ConsumerAutoTradeDetail, ConsumerAutoTradeRow, ConsumerTradeResult } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
@@ -124,15 +125,16 @@ export default function ConsumerTradesScreen() {
       {rows.length ? (
         rows.map((row) => (
           <View key={row.id}>
-            <PressableScale accessibilityLabel={`${row.eventTitle} ${row.selectionLabel}`} accessibilityRole="button" onPress={() => void openDetail(row.id)}>
+            <PressableScale accessibilityLabel={`${row.eventTitle} ${tradeSelectionLabel(row.marketLabel, row.selectionLabel)}`} accessibilityRole="button" onPress={() => void openDetail(row.id)}>
               <View style={[styles.row, { borderBottomColor: theme.border }]}>
                 <View style={[styles.marketIcon, { backgroundColor: theme.field }]}>
                   <SoccerBall color={theme.textMuted} size={18} weight="regular" />
                 </View>
                 <View style={styles.flex}>
                   <Text numberOfLines={1} style={[styles.fixture, { color: theme.text }]}>{row.eventTitle}</Text>
+                  <Text numberOfLines={1} style={[styles.selection, { color: theme.text }]}>{tradeSelectionLabel(row.marketLabel, row.selectionLabel)}</Text>
                   <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>
-                    {row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {tradeStatus(row)}
+                    {row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {tradeStatus(row)}
                   </Text>
                 </View>
                 <View style={styles.right}>
@@ -177,6 +179,8 @@ function DetailRows({ detail }: { detail: ConsumerAutoTradeDetail }) {
   const { theme } = usePolyClawTheme();
   const unavailable = detail.status === 'SETTLED' && detail.result == null;
   const facts: [string, string][] = [
+    ['Trade', tradeSelectionLabel(detail.marketLabel, detail.selectionLabel)],
+    ['Market', detail.marketLabel],
     ['Mode', detail.executionMode === 'PAPER' ? 'Test · simulated funds' : 'Live · funded wallet'],
     ['Maximum price', `${(detail.maxPrice * 100).toFixed(1)}¢`],
     ['Approved maximum', money(detail.stakeUsdc)],
@@ -236,6 +240,7 @@ const styles = StyleSheet.create({
   note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, marginBottom: spacing.sm },
   right: { alignItems: 'flex-end', gap: 6 },
   row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm },
+  selection: { fontFamily: fonts.semibold, fontSize: 12.5, marginTop: 2 },
   sectionTitle: { fontFamily: fonts.semibold, fontSize: 15, marginBottom: spacing.xs, marginTop: spacing.md },
   sub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
 });

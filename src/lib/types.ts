@@ -346,7 +346,7 @@ export type ConsumerHomeStatus = {
   };
   openTrades: number;
   today: {
-    id: string; executionMode: 'PAPER' | 'LIVE'; eventTitle: string; selectionLabel: string; status: string; stakeUsdc: number; createdAt: string;
+    id: string; executionMode: 'PAPER' | 'LIVE'; eventTitle: string; marketLabel?: string; selectionLabel: string; status: string; stakeUsdc: number; createdAt: string;
     result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null;
   }[];
   consent: { currentVersion: number; acceptedVersion: number | null; fresh: boolean };

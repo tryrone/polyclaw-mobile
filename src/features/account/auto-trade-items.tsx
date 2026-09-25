@@ -25,6 +25,8 @@ export function AutoTradeItem() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const data = resource.data;
+  const limits = data?.limits;
+  const consent = data?.consent;
 
   const run = async <T,>(action: () => Promise<T>, note: string | ((result: T) => string)) => {
     setBusy(true);
@@ -41,13 +43,13 @@ export function AutoTradeItem() {
   };
 
   const saveLimits = async () => {
-    const per = Number(perTrade || (data?.limits.requestedPerTradeUsdc ?? data?.limits.perTradeUsdc ?? 0));
-    const day = Number(daily || (data?.limits.requestedDailyUsdc ?? data?.limits.dailyUsdc ?? 0));
+    const per = Number(perTrade || (limits?.requestedPerTradeUsdc ?? limits?.perTradeUsdc ?? 0));
+    const day = Number(daily || (limits?.requestedDailyUsdc ?? limits?.dailyUsdc ?? 0));
     if (!Number.isFinite(per) || !Number.isFinite(day) || per <= 0 || day <= 0) { setMessage('Enter a valid per-trade and daily amount.'); return; }
-    if (per < 1 || per > (data?.limits.platformMaxTradeUsdc ?? 25)) { setMessage(`Per-trade limit must be between $1 and $${data?.limits.platformMaxTradeUsdc ?? 25}.`); return; }
-    if (day < per || day > (data?.limits.platformMaxDayUsdc ?? 100)) { setMessage(`Daily limit must be at least the per-trade amount and no more than $${data?.limits.platformMaxDayUsdc ?? 100}.`); return; }
+    if (per < 1 || per > (limits?.platformMaxTradeUsdc ?? 25)) { setMessage(`Per-trade limit must be between $1 and $${limits?.platformMaxTradeUsdc ?? 25}.`); return; }
+    if (day < per || day > (limits?.platformMaxDayUsdc ?? 100)) { setMessage(`Daily limit must be at least the per-trade amount and no more than $${limits?.platformMaxDayUsdc ?? 100}.`); return; }
     await run(async () => {
-      if (!data?.consent.fresh) await consumer('acceptCopyConsent', { version: data?.consent.currentVersion ?? 1, accepted: true });
+      if (!consent?.fresh) await consumer('acceptCopyConsent', { version: consent?.currentVersion ?? 1, accepted: true });
       await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
     }, 'Limits saved.');
   };
@@ -64,8 +66,8 @@ export function AutoTradeItem() {
       (result) => autoTradeModeNotice(mode, result),
     );
     if (mode === 'LIVE') {
-      if (!data.liveAccess.available) {
-        setMessage(data.liveAccess.reason ?? 'Live trading is not available for this account yet.');
+      if (!data.liveAccess?.available) {
+        setMessage(data.liveAccess?.reason ?? 'Live trading is not available for this account yet.');
         return;
       }
       Alert.alert(
@@ -88,21 +90,21 @@ export function AutoTradeItem() {
     <AccountItem
       Icon={Lightning}
       title="Auto-trade"
-      detail={data ? `${money(data.limits.perTradeUsdc)} per trade · ${money(data.limits.dailyUsdc)} per day` : 'Copy published signals within your limits'}
+      detail={limits ? `${money(limits.perTradeUsdc)} per trade · ${money(limits.dailyUsdc)} per day` : 'Copy published signals within your limits'}
       status={status}
       tone={data?.enabled ? 'success' : data?.ready ? 'neutral' : 'warning'}
       expanded={expanded}
       onPress={() => setExpanded((value) => !value)}
     >
       <Text style={[styles.body, { color: theme.textMuted }]}>
-        {data?.consent.fresh
-          ? `Copy-trading consent v${data.consent.currentVersion} accepted.`
+        {consent?.fresh
+          ? `Copy-trading consent v${consent.currentVersion} accepted.`
           : 'Accept the current copy-trading consent to turn auto-trade on.'}
       </Text>
       <View accessibilityLabel="Trading mode" style={[hostStyles.modeControl, { backgroundColor: theme.field, borderColor: theme.border }]}>
         {(['PAPER', 'LIVE'] as const).map((mode) => {
           const active = data?.executionMode === mode;
-          const unavailable = mode === 'LIVE' && data?.liveAccess.available === false;
+          const unavailable = mode === 'LIVE' && data?.liveAccess?.available !== true;
           return (
             <Pressable
               accessibilityRole="button"
@@ -122,11 +124,11 @@ export function AutoTradeItem() {
           ? 'Live uses real USDC from your dedicated execution wallet. The signer cannot withdraw.'
           : 'Test uses simulated funds. No order is sent to Polymarket.'}
       </Text>
-      {!data?.liveAccess.available ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{data?.liveAccess.reason ?? 'Live trading is not available for this account yet.'}</Text> : null}
-      {data ? (
+      {data && data.liveAccess?.available !== true ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{data.liveAccess?.reason ?? 'Live trading is not available for this account yet.'}</Text> : null}
+      {limits ? (
         <Text style={[styles.footnote, { color: theme.textMuted }]}>
-          {money(data.limits.dailyUsedUsdc)} used · {money(data.limits.dailyRemainingUsdc)} remaining · next trade up to {money(data.limits.approvedStakePreviewUsdc)}.{`\n`}
-          Platform maximum: {money(data.limits.platformMaxTradeUsdc)} per trade and {money(data.limits.platformMaxDayUsdc)} per UTC day. Resets {new Date(data.limits.resetsAt).toLocaleString()}.
+          {money(limits.dailyUsedUsdc)} used · {money(limits.dailyRemainingUsdc)} remaining · next trade up to {money(limits.approvedStakePreviewUsdc)}.{`\n`}
+          Platform maximum: {money(limits.platformMaxTradeUsdc)} per trade and {money(limits.platformMaxDayUsdc)} per UTC day. Resets {new Date(limits.resetsAt).toLocaleString()}.
         </Text>
       ) : null}
       {message ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{message}</Text> : null}
@@ -137,7 +139,7 @@ export function AutoTradeItem() {
             accessibilityLabel="Per trade amount in USDC"
             keyboardType="decimal-pad"
             onChangeText={setPerTrade}
-            placeholder={String(data?.limits.requestedPerTradeUsdc ?? data?.limits.perTradeUsdc ?? 5)}
+            placeholder={String(limits?.requestedPerTradeUsdc ?? limits?.perTradeUsdc ?? 5)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
             value={perTrade}
@@ -149,7 +151,7 @@ export function AutoTradeItem() {
             accessibilityLabel="Daily amount in USDC"
             keyboardType="decimal-pad"
             onChangeText={setDaily}
-            placeholder={String(data?.limits.requestedDailyUsdc ?? data?.limits.dailyUsdc ?? 15)}
+            placeholder={String(limits?.requestedDailyUsdc ?? limits?.dailyUsdc ?? 15)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
             value={daily}

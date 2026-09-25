@@ -9,6 +9,7 @@ import { ConsumerHomeSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
+import { tradeSelectionLabel } from '@/lib/markets';
 import type { AutoTradePerformance, ConsumerHomeStatus, PolyClawPrimaryAction } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
 
@@ -190,7 +191,8 @@ export default function ConsumerHome() {
           <View key={row.id} style={[styles.previewRow, { borderBottomColor: theme.border }]}>
             <View style={styles.flex}>
               <Text numberOfLines={1} style={[styles.previewTitle, { color: theme.text }]}>{row.eventTitle}</Text>
-              <Text numberOfLines={1} style={[styles.previewSub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.selectionLabel} · {row.result ?? row.status}</Text>
+              <Text numberOfLines={1} style={[styles.previewSelection, { color: theme.text }]}>{tradeSelectionLabel(row.marketLabel, row.selectionLabel)}</Text>
+              <Text numberOfLines={1} style={[styles.previewSub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.result ?? row.status}</Text>
             </View>
             <Text style={[styles.previewValue, { color: row.netPnlUsdc == null ? theme.text : row.netPnlUsdc >= 0 ? theme.success : theme.danger }]}>
               {row.status === 'SETTLED' && row.netPnlUsdc == null ? 'PnL unavailable' : row.netPnlUsdc == null ? money(row.actualStakeUsdc || row.stakeUsdc) : signedMoney(row.netPnlUsdc)}
@@ -228,6 +230,7 @@ const styles = StyleSheet.create({
   previewHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   previewMeta: { fontFamily: fonts.medium, fontSize: 11.5 },
   previewRow: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 52 },
+  previewSelection: { fontFamily: fonts.semibold, fontSize: 12.5, marginTop: 2 },
   previewSub: { fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
   previewTitle: { fontFamily: fonts.semibold, fontSize: 14 },
   previewValue: { fontFamily: fonts.bold, fontSize: 14, ...numeric },
