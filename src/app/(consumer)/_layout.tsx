@@ -1,3 +1,4 @@
+import { BottomClearanceProvider } from '@/components/bottom-clearance';
 import { Tabs } from 'expo-router';
 import { ArrowsLeftRight, HouseSimple, User } from 'phosphor-react-native';
 
@@ -18,13 +19,13 @@ export default function ConsumerLayout() {
   const { session } = useAuth();
   if (session?.user.role !== 'USER') return null;
   return (
-    <>
+    <BottomClearanceProvider>
       <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
         {tabs.map(({ name }) => (
           <Tabs.Screen key={name} name={name} />
         ))}
       </Tabs>
       <PolyClawTabBar items={tabs} />
-    </>
+    </BottomClearanceProvider>
   );
 }

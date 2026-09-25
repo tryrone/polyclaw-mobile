@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
-import { useState } from 'react';
-import { Alert, Linking, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionButton, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { PressableScale } from '@/components/motion';
@@ -8,8 +8,9 @@ import { AdminTradesSkeleton } from '@/components/page-skeletons';
 import { PnlChartCard } from '@/components/pnl-chart-card';
 import { useAuth } from '@/auth/provider';
 import { useAdminResource } from '@/hooks/use-admin-resource';
-import type { AdminDeliveryRow, AdminSignalBatch, AutoTradePerformance, AutoTradePerformanceRange } from '@/lib/types';
+import type { AdminDeliveryRow, AdminTradeDetail, AutoTradePerformance, AutoTradePerformanceRange } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
+import { AppBottomSheet, type AppBottomSheetHandle } from '@/components/app-bottom-sheet';
 
 const filters = ['ALL', 'OPEN', 'FILLED', 'SETTLED', 'FAILED', 'SKIPPED'] as const;
 type Filter = (typeof filters)[number];
@@ -26,35 +27,48 @@ export default function AdminTradesScreen() {
   const [mode, setMode] = useState<'LIVE' | 'PAPER'>('LIVE');
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminTradeDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [cancellingBatchId, setCancellingBatchId] = useState<string | null>(null);
-  const [retryBatch, setRetryBatch] = useState<AdminSignalBatch | null>(null);
+  const detailSheet = useRef<AppBottomSheetHandle>(null);
+  const detailRequest = useRef(0);
   const resource = useAdminResource<AdminDeliveryRow[]>('listDeliveries', {
     ...(filter === 'ALL' ? {} : { status: filter }),
     ...(query.trim() ? { query: query.trim() } : {}),
     limit: 150,
   }, 20_000);
-  const published = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'PUBLISHED', limit: 30 }, 20_000);
   const performance = useAdminResource<AutoTradePerformance>('tradePerformance', { range, mode }, 20_000);
   const rows = resource.data ?? [];
-  const initialLoading = (resource.loading && resource.data === null) || (published.loading && published.data === null);
+  const initialLoading = resource.loading && resource.data === null;
 
-  const cancelBatch = async (batch: AdminSignalBatch) => {
-    setCancellingBatchId(batch.id);
+  const openDetail = async (deliveryId: string) => {
+    const request = ++detailRequest.current;
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    detailSheet.current?.present();
+    try { const result = await admin<AdminTradeDetail>('tradeDetail', { deliveryId }); if (request === detailRequest.current) setDetail(result); }
+    catch (error) { if (request === detailRequest.current) setDetailError(error instanceof Error ? error.message : 'Could not load this trade.'); }
+    finally { if (request === detailRequest.current) setDetailLoading(false); }
+  };
+
+  const cancelBatch = async (batchId: string) => {
+    setCancellingBatchId(batchId);
     try {
-      const result = await admin<AdminSignalBatch & { venueCancellation: { cancelled: number; failed: number } }>('cancelBatch', {
-        batchId: batch.id,
+      const result = await admin<{ venueCancellation: { cancelled: number; failed: number } }>('cancelBatch', {
+        batchId,
         reason: 'Cancelled by the publisher from the PolyClaw admin app.',
         idempotencyKey: randomUUID(),
         confirmed: true,
       });
       if (result.venueCancellation.failed > 0) {
         setMessage(`${result.venueCancellation.failed} venue order${result.venueCancellation.failed === 1 ? '' : 's'} could not be cancelled. Tap Retry venue cancellation.`);
-        setRetryBatch(batch);
       } else {
         setMessage(`Batch cancelled. ${result.venueCancellation.cancelled} open venue order${result.venueCancellation.cancelled === 1 ? '' : 's'} cancelled.`);
-        setRetryBatch(null);
       }
-      await Promise.all([published.refresh(), resource.refresh()]);
+      await resource.refresh();
+      if (detail?.batchId === batchId) await openDetail(detail.id);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Batch cancellation failed.');
     } finally {
@@ -62,35 +76,26 @@ export default function AdminTradesScreen() {
     }
   };
 
-  const confirmCancellation = (batch: AdminSignalBatch) => {
+  const confirmCancellation = (batchId: string) => {
     Alert.alert(
       'Cancel this batch?',
-      'Pending trades will be stopped and PolyClaw will try to cancel every open venue order. Filled exposure remains open for settlement.',
-      [{ text: 'Keep batch', style: 'cancel' }, { text: 'Cancel batch', style: 'destructive', onPress: () => void cancelBatch(batch) }],
+      `${detail?.cancellationScope ? `${detail.cancellationScope.orders} unfilled orders across ${detail.cancellationScope.users} users and ${detail.cancellationScope.selections} selections. ` : ''}This affects the entire batch, including other users. Filled positions remain open for settlement.`,
+      [{ text: 'Keep orders', style: 'cancel' }, { text: 'Cancel remaining', style: 'destructive', onPress: () => void cancelBatch(batchId) }],
     );
   };
 
   if (initialLoading) return (
-    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void Promise.all([resource.refresh(), published.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
-      <Header title="Published" />
+    <Screen refreshControl={<RefreshControl refreshing onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
+      <Header title="Trades" />
       <ResourceState loading loadingFallback={<AdminTradesSkeleton />} />
     </Screen>
   );
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={resource.loading || published.loading || performance.loading} onRefresh={() => void Promise.all([resource.refresh(), published.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
-      <Header title="Published" />
+    <Screen refreshControl={<RefreshControl refreshing={resource.loading || performance.loading} onRefresh={() => void Promise.all([resource.refresh(), performance.refresh()])} tintColor={theme.accent} />}>
+      <Header title="Trades" />
       <ResourceState error={resource.error} />
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
-      {retryBatch ? (
-        <ActionButton
-          label="Retry venue cancellation"
-          loading={cancellingBatchId === retryBatch.id}
-          onPress={() => void cancelBatch(retryBatch)}
-          variant="secondary"
-        />
-      ) : null}
-
       <PnlChartCard
         data={performance.data?.range === range && performance.data.mode === mode ? performance.data : null}
         error={performance.error}
@@ -103,22 +108,7 @@ export default function AdminTradesScreen() {
         title="Platform trade PnL"
       />
 
-      {published.data?.length ? (
-        <View style={styles.batchSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Published batches</Text>
-          {published.data.map((batch) => (
-            <View key={batch.id} style={[styles.batchRow, { borderBottomColor: theme.border }]}>
-              <View style={styles.flex}>
-                <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{batch.title ?? 'Untitled batch'}</Text>
-                <Text style={[styles.sub, { color: theme.textMuted }]}>{batch.signalCount} signals · published {batch.publishedAt ? new Date(batch.publishedAt).toLocaleString() : 'recently'}</Text>
-              </View>
-              <ActionButton label="Cancel batch" loading={cancellingBatchId === batch.id} onPress={() => confirmCancellation(batch)} variant="secondary" />
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.filterRow}>
+      <ScrollView contentContainerStyle={styles.filterRow} horizontal showsHorizontalScrollIndicator={false}>
         {filters.map((item) => {
           const active = filter === item;
           return (
@@ -129,7 +119,7 @@ export default function AdminTradesScreen() {
             </PressableScale>
           );
         })}
-      </View>
+      </ScrollView>
 
       <TextInput
         accessibilityLabel="Search deliveries by user"
@@ -142,7 +132,7 @@ export default function AdminTradesScreen() {
       />
 
       {rows.length ? rows.map((row) => (
-        <View key={row.id} style={[styles.row, { borderBottomColor: theme.border }]}>
+        <PressableScale accessibilityLabel={`Open ${row.eventTitle} trade details`} accessibilityRole="button" key={row.id} onPress={() => void openDetail(row.id)}><View style={[styles.row, { borderBottomColor: theme.border }]}>
           <View style={styles.flex}>
             <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>{row.eventTitle}</Text>
             <Text numberOfLines={1} style={[styles.sub, { color: theme.textMuted }]}>{row.executionMode === 'PAPER' ? 'Test' : 'Live'} · {row.email} · {row.selectionLabel}</Text>
@@ -156,7 +146,7 @@ export default function AdminTradesScreen() {
             </Text>
             <StatusPill label={row.settlementState === 'AWAITING_POLYMARKET' ? 'Awaiting Polymarket' : row.result ?? row.status} tone={row.settlementState === 'AWAITING_POLYMARKET' ? 'warning' : row.result === 'WON' ? 'success' : row.result === 'LOST' || ['FAILED', 'SKIPPED'].includes(row.status) ? 'danger' : 'neutral'} />
           </View>
-        </View>
+        </View></PressableScale>
       )) : <EmptyState detail="Deliveries appear here once a batch is published." title="No deliveries" />}
 
       <ActionButton
@@ -166,17 +156,42 @@ export default function AdminTradesScreen() {
         onPress={() => void resource.refresh()}
         variant="secondary"
       />
+      <AppBottomSheet onDismiss={() => { detailRequest.current++; setDetail(null); setDetailError(null); }} ref={detailSheet} title={detail?.eventTitle ?? 'Trade details'}>
+        {detailLoading ? <ResourceState loading /> : detailError ? <ResourceState error={detailError} /> : detail ? (
+          <>
+            <View style={styles.detailSummary}>
+              <Text style={[styles.title, { color: theme.text }]}>{detail.selectionLabel}</Text>
+              <Text style={[styles.sub, { color: theme.textMuted }]}>{detail.marketLabel} · {detail.executionMode === 'PAPER' ? 'Test' : 'Live'} · {detail.email}</Text>
+            </View>
+            {([
+              ['Status', detail.settlementState === 'AWAITING_POLYMARKET' ? 'Awaiting Polymarket' : detail.result ?? detail.status],
+              ['Approved', money(detail.stakeUsdc)], ['Actual stake', money(detail.actualStakeUsdc)],
+              ['Average entry', detail.averageFillPrice == null ? '—' : `${(detail.averageFillPrice * 100).toFixed(1)}¢`],
+              ['Returned', detail.returnedUsdc == null ? 'Pending' : money(detail.returnedUsdc)],
+              ['Net PnL', detail.netPnlUsdc == null ? 'Pending' : `${detail.netPnlUsdc >= 0 ? '+' : '-'}${money(Math.abs(detail.netPnlUsdc))}`],
+            ] as [string, string][]).map(([label, value]) => <View key={label} style={[styles.fact, { borderBottomColor: theme.border }]}><Text style={[styles.sub, { color: theme.textMuted }]}>{label}</Text><Text style={[styles.factValue, { color: theme.text }]}>{value}</Text></View>)}
+            {detail.fills.length ? <Text style={[styles.sectionTitle, { color: theme.text }]}>Fills</Text> : null}
+            {detail.fills.map((fill, index) => <View key={`${fill.occurredAt}:${index}`} style={[styles.fact, { borderBottomColor: theme.border }]}><Text style={[styles.sub, { color: theme.textMuted }]}>{new Date(fill.occurredAt).toLocaleString()}</Text><Text style={[styles.factValue, { color: theme.text }]}>{fill.shares.toFixed(2)} @ {(fill.price * 100).toFixed(1)}¢</Text></View>)}
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
+            {detail.timeline.map((step) => <View key={`${step.label}:${step.at}`} style={[styles.fact, { borderBottomColor: theme.border }]}><Text style={[styles.sub, { color: theme.textMuted }]}>{step.label}</Text><Text style={[styles.factValue, { color: theme.text }]}>{new Date(step.at).toLocaleString()}</Text></View>)}
+            <Text style={[styles.sub, { color: theme.textMuted }]}>{detail.cancellationScope ? `${detail.cancellationScope.orders} unfilled orders · ${detail.cancellationScope.users} users · ${detail.cancellationScope.selections} selections in this batch` : 'This cancels unfilled orders for every user in this batch.'}</Text>
+            <ActionButton disabled={detail.cancellationScope?.orders === 0} label="Cancel remaining orders in this batch" loading={cancellingBatchId === detail.batchId} onPress={() => confirmCancellation(detail.batchId)} variant="danger" />
+            <Text style={[styles.sub, { color: theme.textMuted }]}>Only unfilled order quantities are cancelled. Filled positions remain open and keep their settlement history.</Text>
+          </>
+        ) : null}
+      </AppBottomSheet>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  batchRow: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm },
-  batchSection: { gap: spacing.xs, marginBottom: spacing.md },
+  detailSummary: { gap: spacing.xs },
+  fact: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 44 },
+  factValue: { flex: 1, fontFamily: fonts.semibold, fontSize: 12.5, textAlign: 'right', ...numeric },
   failure: { fontFamily: fonts.medium, fontSize: 11.5, marginTop: 3 },
   figure: { fontFamily: fonts.bold, fontSize: 14.5, ...numeric },
   filter: { alignItems: 'center', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.md },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+  filterRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm, paddingRight: spacing.lg },
   filterText: { fontFamily: fonts.bold, fontSize: 12 },
   flex: { flex: 1, minWidth: 0 },
   message: { fontFamily: fonts.medium, fontSize: 12.5, marginBottom: spacing.sm },

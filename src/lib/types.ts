@@ -82,6 +82,7 @@ export type AdminFootballMarketType = string;
 export type AdminFootballGame = {
   id: string; eventTitle: string; competition: string | null; country: string | null; homeTeam: string; awayTeam: string;
   kickoff: string; marketTypes: AdminFootballMarketType[]; outcomeCount: number;
+  prices?: { label: string; price: number | null }[];
 };
 export type AdminFootballOutcome = {
   eventId: string; gameId: string; marketId: string; conditionId: string; tokenId: string; sport: 'football';
@@ -95,9 +96,10 @@ export type AdminFootballGameMarkets = {
   markets: { type: AdminFootballMarketType; label: string; outcomes: AdminFootballOutcome[] }[];
   asOf: string;
 };
-export type AdminFootballGames = { items: AdminFootballGame[]; nextCursor: string | null; total: number; asOf: string; windowEndsAt: string };
+export type AdminFootballGames = { version: '2026-09-25.v2'; items: AdminFootballGame[]; nextCursor: string | null; total?: number; asOf: string; freshUntil: string; windowEndsAt: string; leagues: string[] };
 export type ConsumerAccount = {
   mode: ConsumerMode; readOnlyAddress?: string | null; embeddedOwnerAddress?: string | null; depositWalletAddress?: string | null; walletStatus: string; walletLifecycle: string; botLifecycle: string; eligibilityCode?: string | null; availablePusd: number | string;
+  walletSetupAvailable?: boolean;
   liveCanaryAllowed: boolean;
   approvalStatus: string; signerStatus: string; signerExpiresAt?: string | null; offboardingState: string;
   notifications: { authorizationExpiry: boolean; orderUpdates: boolean; riskHalts: boolean; billingWindDown: boolean; eligibilityLoss: boolean; marketing: boolean };
@@ -341,7 +343,7 @@ export type ConsumerHomeStatus = {
   liveAccess: { available: boolean; reason: string | null };
   limits: {
     perTradeUsdc: number; dailyUsdc: number; requestedPerTradeUsdc: number; requestedDailyUsdc: number;
-    platformMaxTradeUsdc: number; platformMaxDayUsdc: number; dailyUsedUsdc: number; dailyRemainingUsdc: number;
+    dailyUsedUsdc: number; dailyRemainingUsdc: number;
     approvedStakePreviewUsdc: number; resetsAt: string;
   };
   openTrades: number;
@@ -406,6 +408,13 @@ export type AdminDeliveryRow = {
   polymarketUrl: string | null;
 };
 
+export type AdminTradeDetail = ConsumerAutoTradeDetail & {
+  cancellationScope?: { orders: number; users: number; selections: number };
+  batchId: string;
+  userId: string;
+  email: string;
+};
+
 export type AdminEligibilityRow = {
   userId: string; email: string; name: string | null; isActive: boolean; autoTradeEnabled: boolean;
   consentVersion: number | null; perTradeUsdc: number; dailyUsdc: number; eligible: boolean;
@@ -415,7 +424,6 @@ export type AdminEligibilityRow = {
 export type AdminPlatformControl = {
   maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number; globallyPaused: boolean;
   pauseReason: string | null; pausedAt: string | null; pausedBy: string | null; updatedBy: string | null; updatedAt: string;
-  hardCaps: { maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number };
   defaults: { maxStakePerTradeUsdc: number; maxStakePerUtcDayUsdc: number };
 };
 
@@ -428,6 +436,7 @@ export type AdminConnections = {
     kmsConfigured: boolean; rpcConfigured: boolean; collateralConfigured: boolean; contractAllowlistConfigured: boolean;
     remoteBuilderSignerConfigured: boolean; rawPrivateKeyAbsent: boolean;
   };
+  readinessChecks: { code: string; label: string; state: 'ready' | 'blocked' | 'unknown'; reason: string | null }[];
 };
 
 export type AdminPublisher = { userId: string; email: string; name: string | null; status: string; grantedBy: string; grantReason: string; grantedAt: string };

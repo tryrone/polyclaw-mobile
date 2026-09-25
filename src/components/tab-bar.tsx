@@ -1,3 +1,4 @@
+import { useBottomClearance } from './bottom-clearance';
 import { usePathname, useRouter } from 'expo-router';
 import type { Icon } from 'phosphor-react-native';
 import { useEffect } from 'react';
@@ -25,6 +26,7 @@ export type TabItem = {
 };
 
 const BAR_INSET = 5;
+export const TAB_BAR_HEIGHT = 60;
 
 function isActive(item: TabItem, pathname: string) {
   return [item.href, ...(item.active ?? [])].some((path) =>
@@ -87,6 +89,7 @@ function TabButton({ item, selected }: { item: TabItem; selected: boolean }) {
  * equal-width targets, so the bar never reflows while the user changes destinations.
  */
 export function PolyClawTabBar({ items }: { items: readonly TabItem[] }) {
+  const { setHeight } = useBottomClearance();
   const { theme } = usePolyClawTheme();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -115,7 +118,7 @@ export function PolyClawTabBar({ items }: { items: readonly TabItem[] }) {
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+    <View onLayout={({ nativeEvent }) => setHeight?.(nativeEvent.layout.height)} pointerEvents="box-none" style={[styles.host, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
       <View
         accessibilityRole="tablist"
         style={[
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
-    minHeight: 60,
+    minHeight: TAB_BAR_HEIGHT,
     overflow: 'hidden',
     shadowOffset: { height: 8, width: 0 },
   },

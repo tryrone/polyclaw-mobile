@@ -1,3 +1,4 @@
+import { BottomClearanceProvider } from '@/components/bottom-clearance';
 import { Tabs } from 'expo-router';
 import { ChartLineUp, GearSix, SoccerBall, UsersThree } from 'phosphor-react-native';
 
@@ -13,7 +14,7 @@ import { useAuth } from '@/auth/provider';
  */
 const tabs: (TabItem & { name: string })[] = [
   { name: 'games', href: '/admin/games', label: 'Games', Icon: SoccerBall },
-  { name: 'trades', href: '/admin/trades', label: 'Published', Icon: ChartLineUp },
+  { name: 'trades', href: '/admin/trades', label: 'Trades', Icon: ChartLineUp },
   { name: 'users', href: '/admin/users', label: 'Users', Icon: UsersThree },
   { name: 'settings', href: '/admin/settings', label: 'Settings', Icon: GearSix },
 ];
@@ -22,13 +23,13 @@ export default function AdminLayout() {
   const { session } = useAuth();
   if (session?.user.role !== 'ADMIN') return null;
   return (
-    <>
+    <BottomClearanceProvider>
       <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
         {tabs.map(({ name }) => (
           <Tabs.Screen key={name} name={name} />
         ))}
       </Tabs>
       <PolyClawTabBar items={tabs} />
-    </>
+    </BottomClearanceProvider>
   );
 }

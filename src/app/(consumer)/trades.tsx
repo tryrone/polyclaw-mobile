@@ -1,5 +1,5 @@
 import { SoccerBall } from 'phosphor-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
@@ -11,6 +11,7 @@ import { useConsumerResource } from '@/hooks/use-consumer-resource';
 import { tradeSelectionLabel } from '@/lib/markets';
 import type { AutoTradePerformance, AutoTradePerformanceRange, ConsumerAutoTradeDetail, ConsumerAutoTradeRow, ConsumerTradeResult } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
+import { AppBottomSheet, type AppBottomSheetHandle } from '@/components/app-bottom-sheet';
 
 type Lens = 'pending' | 'open' | 'closed';
 type Tone = 'success' | 'warning' | 'danger' | 'neutral';
@@ -53,29 +54,42 @@ export default function ConsumerTradesScreen() {
   const resource = useConsumerResource<ConsumerAutoTradeRow[]>('autoTradeTrades', { filter: lens }, 20_000);
   const performance = useConsumerResource<AutoTradePerformance>('autoTradePerformance', { range, timeZone }, 20_000);
   const [detail, setDetail] = useState<ConsumerAutoTradeDetail | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const detailSheet = useRef<AppBottomSheetHandle>(null);
+  const detailRequest = useRef(0);
 
   const rows = useMemo(() => resource.data ?? [], [resource.data]);
   const initialLoading = resource.loading && resource.data === null;
 
   const openDetail = useCallback(async (id: string) => {
-    if (detail?.id === id) { setDetail(null); return; }
+    setSelectedId(id);
+    const request = ++detailRequest.current;
+    setDetail(null);
     setDetailError(null);
+    setDetailLoading(true);
+    detailSheet.current?.present();
     try {
-      setDetail(await consumer<ConsumerAutoTradeDetail>('autoTradeTrade', { deliveryId: id }));
+      const result = await consumer<ConsumerAutoTradeDetail>('autoTradeTrade', { deliveryId: id });
+      if (request === detailRequest.current) setDetail(result);
     } catch (error) {
-      setDetailError(error instanceof Error ? error.message : 'Could not load this trade.');
+      if (request === detailRequest.current) setDetailError(error instanceof Error ? error.message : 'Could not load this trade.');
+    } finally {
+      if (request === detailRequest.current) setDetailLoading(false);
     }
-  }, [consumer, detail?.id]);
+  }, [consumer]);
 
   const closePosition = async () => {
     if (!detail) return;
     setBusy(true);
     try {
       await consumer('closeAutoTradePosition', { deliveryId: detail.id });
-      setDetail(null);
+      detailSheet.current?.dismiss();
       await resource.refresh();
+    } catch (error) {
+      setDetailError(error instanceof Error ? error.message : 'Could not close this position.');
     } finally {
       setBusy(false);
     }
@@ -120,8 +134,6 @@ export default function ConsumerTradesScreen() {
           );
         })}
       </View>
-      {detailError ? <Text style={[styles.error, { color: theme.danger }]}>{detailError}</Text> : null}
-
       {rows.length ? (
         rows.map((row) => (
           <View key={row.id}>
@@ -146,23 +158,6 @@ export default function ConsumerTradesScreen() {
               </View>
             </PressableScale>
 
-            {detail?.id === row.id ? (
-              <Card>
-                <DetailRows detail={detail} />
-                {detail.polymarketUrl ? <ActionButton
-                  label="Open on Polymarket"
-                  onPress={() => void Linking.openURL(detail.polymarketUrl!)}
-                  variant="secondary"
-                /> : null}
-                <ActionButton
-                  disabled={!detail.canClose}
-                  label={detail.canClose ? 'Close position' : 'No open position'}
-                  loading={busy}
-                  onPress={() => void closePosition()}
-                  variant="secondary"
-                />
-              </Card>
-            ) : null}
           </View>
         ))
       ) : (
@@ -171,6 +166,32 @@ export default function ConsumerTradesScreen() {
           title="Nothing here"
         />
       )}
+      <AppBottomSheet
+        onDismiss={() => { detailRequest.current++; setSelectedId(null); setDetail(null); setDetailError(null); }}
+        ref={detailSheet}
+        title={detail?.eventTitle ?? 'Trade details'}>
+        {detailLoading ? <ResourceState loading /> : detailError ? (
+          <ResourceState error={detailError} />
+        ) : detail ? (
+          <>
+            <Card>
+              <DetailRows detail={detail} />
+            </Card>
+            {detail.polymarketUrl ? <ActionButton
+              label="Open on Polymarket"
+              onPress={() => void Linking.openURL(detail.polymarketUrl!)}
+              variant="secondary"
+            /> : null}
+            <ActionButton
+              disabled={!detail.canClose}
+              label={detail.canClose ? 'Close position' : 'No open position'}
+              loading={busy}
+              onPress={() => void closePosition()}
+              variant="secondary"
+            />
+          </>
+        ) : selectedId ? <ResourceState loading /> : null}
+      </AppBottomSheet>
     </Screen>
   );
 }

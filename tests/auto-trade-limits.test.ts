@@ -7,9 +7,9 @@ const home = readFileSync('src/app/(consumer)/home.tsx', 'utf8');
 const adminSettings = readFileSync('src/app/(admin)/admin/settings.tsx', 'utf8');
 
 describe('user-controlled Auto-trade limits', () => {
-  it('validates personal limits against server-provided platform ceilings', () => {
-    assert.match(accountLimits, /platformMaxTradeUsdc/);
-    assert.match(accountLimits, /platformMaxDayUsdc/);
+  it('validates personal limits without silently imposing retired platform ceilings', () => {
+    assert.doesNotMatch(accountLimits, /platformMaxTradeUsdc/);
+    assert.doesNotMatch(accountLimits, /platformMaxDayUsdc/);
     assert.match(accountLimits, /day < per/);
     assert.match(home, /Existing limits never increase automatically/);
   });
@@ -21,9 +21,9 @@ describe('user-controlled Auto-trade limits', () => {
     assert.match(accountLimits, /resetsAt/);
   });
 
-  it('keeps personal authorization user-controlled while exposing admin hard caps', () => {
-    assert.match(adminSettings, /Users choose their own limits up to these ceilings/);
-    assert.match(adminSettings, /hardCaps\.maxStakePerTradeUsdc/);
+  it('keeps personal authorization user-controlled and removes obsolete admin cap controls', () => {
+    assert.match(adminSettings, /Personal amounts remain user-controlled and are never silently clamped/);
+    assert.doesNotMatch(adminSettings, /hardCaps\.maxStakePerTradeUsdc/);
   });
 
   it('lets the user choose Test or Live with an explicit funded-risk confirmation', () => {

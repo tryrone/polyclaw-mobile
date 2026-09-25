@@ -17,6 +17,8 @@ import { PolyClawThemeProvider, usePolyClawTheme } from '@/theme';
 import { NotificationBootstrap } from '@/notifications/bootstrap';
 import { UnlockView } from '@/components/unlock-view';
 import { PolyClawWalletProvider } from '@/wallet/privy-provider';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@/components/app-bottom-sheet';
 
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 500, fade: true });
@@ -61,5 +63,13 @@ export default function RootLayout() {
   });
   useEffect(() => { if (loaded) SplashScreen.hide(); }, [loaded]);
   if (!loaded) return null;
-  return <PolyClawThemeProvider><AuthProvider><PolyClawWalletProvider><NotificationBootstrap /><AuthenticatedStack /></PolyClawWalletProvider></AuthProvider></PolyClawThemeProvider>;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PolyClawThemeProvider>
+        <BottomSheetModalProvider>
+          <AuthProvider><PolyClawWalletProvider><NotificationBootstrap /><AuthenticatedStack /></PolyClawWalletProvider></AuthProvider>
+        </BottomSheetModalProvider>
+      </PolyClawThemeProvider>
+    </GestureHandlerRootView>
+  );
 }

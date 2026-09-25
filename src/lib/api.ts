@@ -58,9 +58,9 @@ export async function consumerRequest<T>(accessToken: string, procedure: Consume
 }
 
 /** Admin-directed auto-trading operator procedures (`polyClawAdmin` router). */
-export type AdminProcedure = 'catalogueSearch' | 'catalogueGames' | 'catalogueGameMarkets' | 'listBatches' | 'getBatch' | 'createDraft' | 'addSignal' | 'updateSignal' | 'removeSignal' | 'moveSignal' | 'discardDraft' | 'validateBatch' | 'previewBatch' | 'publishBatch' | 'cancelBatch' | 'deliverySummary' | 'listDeliveries' | 'tradePerformance' | 'dispatchBatch' | 'dispatchDelivery' | 'expireStaleSignals' | 'eligibilityDirectory' | 'publisherStatus' | 'listPublishers' | 'publisherAudit' | 'grantPublisher' | 'revokePublisher' | 'platformControl' | 'updatePlatformControl' | 'setGlobalPause' | 'connections';
+export type AdminProcedure = 'catalogueSearch' | 'catalogueGames' | 'catalogueGameMarkets' | 'listBatches' | 'getBatch' | 'createDraft' | 'addSignal' | 'updateSignal' | 'removeSignal' | 'moveSignal' | 'discardDraft' | 'validateBatch' | 'previewBatch' | 'publishBatch' | 'cancelBatch' | 'deliverySummary' | 'listDeliveries' | 'tradeDetail' | 'tradePerformance' | 'dispatchBatch' | 'dispatchDelivery' | 'expireStaleSignals' | 'eligibilityDirectory' | 'publisherStatus' | 'listPublishers' | 'publisherAudit' | 'grantPublisher' | 'revokePublisher' | 'platformControl' | 'setGlobalPause' | 'connections';
 
-const adminQueries = new Set<AdminProcedure>(['catalogueSearch', 'catalogueGames', 'catalogueGameMarkets', 'listBatches', 'getBatch', 'validateBatch', 'previewBatch', 'deliverySummary', 'listDeliveries', 'tradePerformance', 'eligibilityDirectory', 'publisherStatus', 'listPublishers', 'publisherAudit', 'platformControl', 'connections']);
+const adminQueries = new Set<AdminProcedure>(['catalogueSearch', 'catalogueGames', 'catalogueGameMarkets', 'listBatches', 'getBatch', 'validateBatch', 'previewBatch', 'deliverySummary', 'listDeliveries', 'tradeDetail', 'tradePerformance', 'eligibilityDirectory', 'publisherStatus', 'listPublishers', 'publisherAudit', 'platformControl', 'connections']);
 
 export async function adminRequest<T>(accessToken: string, procedure: AdminProcedure, input?: Record<string, unknown>): Promise<T> {
   const endpoint = client(accessToken).polyClawAdmin[procedure];

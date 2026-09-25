@@ -9,7 +9,7 @@ describe('admin games catalogue', () => {
     assert.match(adminGames, /catalogueHydrated/);
     assert.match(adminGames, /requestAnimationFrame\(\(\) => setCatalogueHydrated\(true\)\)/);
     assert.match(adminGames, /useAdminResource<AdminSignalBatch\[]>\([\s\S]*games !== null \|\| catalogueError !== null/);
-    assert.match(adminGames, /!catalogueHydrated \|\| \(!games && catalogueLoading\)/);
+    assert.match(adminGames, /!catalogueHydrated \|\| catalogueLoading/);
     assert.match(adminGames, /AdminGamesListSkeleton/);
     assert.doesNotMatch(adminGames, /catalogueLoading \|\| drafts\.loading/);
   });
@@ -21,8 +21,8 @@ describe('admin games catalogue', () => {
     assert.match(adminGames, /setTimeout\([\s\S]*SEARCH_DEBOUNCE_MS/);
     assert.match(adminGames, /pageSize: GAMES_PAGE_SIZE/);
     assert.match(adminGames, /nextCursor/);
-    assert.match(adminGames, /onScrollPosition=\{selected \? undefined : handleCatalogueScroll\}/);
-    assert.match(adminGames, /catalogueEndY\.current/);
+    assert.match(adminGames, /onEndReached=/);
+    assert.match(adminGames, /ListScreen/);
     assert.match(adminGames, /new Map\([\s\S]*game\.id/);
   });
 

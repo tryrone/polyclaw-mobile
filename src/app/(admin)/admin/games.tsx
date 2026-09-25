@@ -1,26 +1,31 @@
 import { randomUUID } from 'expo-crypto';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { ArrowDown, ArrowLeft, ArrowUp, Check, MagnifyingGlass, Plus, Trash } from 'phosphor-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useBottomClearance } from '@/components/bottom-clearance';
 
 import { useAuth } from '@/auth/provider';
 import { PressableScale } from '@/components/motion';
 import { AdminGamesListSkeleton } from '@/components/page-skeletons';
-import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
+import { ActionButton, Card, EmptyState, Header, ResourceState, Screen, ListScreen, money } from '@/components/ui-kit';
 import { useAdminResource } from '@/hooks/use-admin-resource';
 import type { AdminBatchPreview, AdminFootballGame, AdminFootballGameMarkets, AdminFootballGames, AdminFootballOutcome, AdminSignalBatch, AdminSignalRow } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
+import { AppBottomSheet, BottomSheetTextInput, type AppBottomSheetHandle } from '@/components/app-bottom-sheet';
 
 type BatchView = AdminSignalBatch & { signals: AdminSignalRow[] };
-type DateFilter = 'ALL' | 'TODAY' | 'TOMORROW';
+type DateFilter = 'TODAY' | 'TOMORROW' | 'WEEK';
 const SEARCH_DEBOUNCE_MS = 350;
 const GAMES_PAGE_SIZE = 20;
 
 function isoDate(offsetDays = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function cents(value: number | null) {
@@ -30,10 +35,13 @@ function cents(value: number | null) {
 /** Game → market → outcome → review. The server returns only verified admin market families. */
 export default function AdminGamesScreen() {
   const { theme } = usePolyClawTheme();
+  const { height: navigationHeight } = useBottomClearance();
+  const [reviewHeight, setReviewHeight] = useState(50);
+  const gameRequest = useRef(0);
   const { admin } = useAuth();
   const [batch, setBatch] = useState<BatchView | null>(null);
   const [query, setQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('TODAY');
   const [competition, setCompetition] = useState<string | null>(null);
   const [games, setGames] = useState<AdminFootballGames | null>(null);
   const [selected, setSelected] = useState<AdminFootballGameMarkets | null>(null);
@@ -47,10 +55,10 @@ export default function AdminGamesScreen() {
   const [edits, setEdits] = useState<Record<string, { maxPrice: string; expiryMinutes: string }>>({});
   const requestId = useRef(0);
   const catalogueRequestPending = useRef(false);
-  const catalogueEndY = useRef<number | null>(null);
+  const reviewSheet = useRef<AppBottomSheetHandle>(null);
+  const pendingOutcomeIds = useRef(new Set<string>());
+  const draftCreation = useRef<Promise<string> | null>(null);
   const drafts = useAdminResource<AdminSignalBatch[]>('listBatches', { status: 'DRAFT' }, 30_000, games !== null || catalogueError !== null);
-
-  const competitions = useMemo(() => [...new Set((games?.items ?? []).map((game) => game.competition).filter((value): value is string => Boolean(value)))].sort(), [games]);
 
   const loadGames = useCallback(async (searchQuery: string, filter: DateFilter, selectedCompetition: string | null, cursor: string | null = null) => {
     const append = cursor !== null;
@@ -63,7 +71,8 @@ export default function AdminGamesScreen() {
     try {
       const result = await admin<AdminFootballGames>('catalogueGames', {
         query: searchQuery.trim() || undefined,
-        date: filter === 'TODAY' ? isoDate() : filter === 'TOMORROW' ? isoDate(1) : undefined,
+        date: filter === 'WEEK' ? undefined : filter === 'TODAY' ? isoDate() : isoDate(1),
+        timeZoneOffsetMinutes: new Date().getTimezoneOffset(),
         competition: selectedCompetition ?? undefined,
         cursor: cursor ?? undefined,
         pageSize: GAMES_PAGE_SIZE,
@@ -71,7 +80,7 @@ export default function AdminGamesScreen() {
       if (request === requestId.current) setGames((current) => {
         if (!append) return result;
         const merged = new Map([...(current?.items ?? []), ...result.items].map((game) => [game.id, game]));
-        return { ...result, items: [...merged.values()] };
+        return { ...result, leagues: [...new Set([...(current?.leagues ?? []), ...result.leagues])].sort(), items: [...merged.values()] };
       });
     } catch (error) {
       if (request === requestId.current) setCatalogueError(error instanceof Error ? error.message : 'Could not load games.');
@@ -99,10 +108,6 @@ export default function AdminGamesScreen() {
     if (!selected && games?.nextCursor) void loadGames(query, dateFilter, competition, games.nextCursor);
   }, [competition, dateFilter, games, loadGames, query, selected]);
 
-  const handleCatalogueScroll = useCallback((offsetY: number, viewportHeight: number) => {
-    if (catalogueEndY.current !== null && offsetY + viewportHeight >= catalogueEndY.current - 240) loadNextGames();
-  }, [loadNextGames]);
-
   const loadBatch = async (id: string) => {
     setPreview(null);
     setBatch(await admin<BatchView>('getBatch', { batchId: id }));
@@ -110,24 +115,33 @@ export default function AdminGamesScreen() {
 
   const ensureDraft = async () => {
     if (batch) return batch.id;
-    const created = await admin<AdminSignalBatch>('createDraft', { title: `Games · ${new Date().toLocaleDateString()}` });
-    await drafts.refresh();
-    setBatch({ ...created, signals: [] });
-    return created.id;
+    if (draftCreation.current) return draftCreation.current;
+    draftCreation.current = admin<AdminSignalBatch>('createDraft', { title: `Games · ${new Date().toLocaleDateString()}` }).then(async (created) => {
+      await drafts.refresh();
+      setBatch({ ...created, signals: [] });
+      return created.id;
+    }).finally(() => { draftCreation.current = null; });
+    return draftCreation.current;
   };
 
   const openGame = async (game: AdminFootballGame) => {
+    const request = ++gameRequest.current;
     setCatalogueLoading(true);
-    try { setSelected(await admin<AdminFootballGameMarkets>('catalogueGameMarkets', { gameId: game.id })); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'This game is no longer available.'); }
-    finally { setCatalogueLoading(false); }
+    try {
+      const detail = await admin<AdminFootballGameMarkets>('catalogueGameMarkets', { gameId: game.id });
+      if (request === gameRequest.current) setSelected(detail);
+    } catch (error) { if (request === gameRequest.current) setMessage(error instanceof Error ? error.message : 'This game is no longer available.'); }
+    finally { if (request === gameRequest.current) setCatalogueLoading(false); }
   };
 
   const addOutcome = async (outcome: AdminFootballOutcome) => {
+    const outcomeKey = `${outcome.eventId}:${outcome.conditionId}:${outcome.tokenId}`;
+    if (pendingOutcomeIds.current.has(outcomeKey)) return;
     if (batch?.signals.some((signal) => signal.kickoff === outcome.kickoff && signal.eventTitle === outcome.eventTitle)) {
       setMessage('Only one outcome per game can be included. Remove the current selection first.');
       return;
     }
+    pendingOutcomeIds.current.add(outcomeKey);
     setBusy(true);
     try {
       const batchId = await ensureDraft();
@@ -144,7 +158,7 @@ export default function AdminGamesScreen() {
       setSelected(null);
       setMessage(`${outcome.selectionLabel} added. Confirm its price in Review.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not add this outcome.'); }
-    finally { setBusy(false); }
+    finally { pendingOutcomeIds.current.delete(outcomeKey); setBusy(false); }
   };
 
   const editFor = (signal: AdminSignalRow) => edits[signal.id] ?? {
@@ -183,6 +197,7 @@ export default function AdminGamesScreen() {
     if (!batch) return;
     setBusy(true);
     try { await admin('removeSignal', { batchId: batch.id, signalId }); await loadBatch(batch.id); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not remove this selection.'); }
     finally { setBusy(false); }
   };
 
@@ -190,11 +205,16 @@ export default function AdminGamesScreen() {
     if (!batch) return;
     setBusy(true);
     try { await admin('moveSignal', { batchId: batch.id, signalId, direction }); await loadBatch(batch.id); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not reorder this selection.'); }
     finally { setBusy(false); }
   };
 
   const review = async () => {
     if (!batch) return;
+    if (batch.signals.some((signal) => {
+      const edit = edits[signal.id];
+      return edit && (Number(edit.maxPrice) / 100 !== signal.maxPrice || Number(edit.expiryMinutes) !== Math.round((new Date(signal.kickoff).getTime() - new Date(signal.expiresAt).getTime()) / 60_000));
+    })) { setPreview(null); setMessage('Confirm your edited prices and expiry times before previewing.'); return; }
     setBusy(true);
     try {
       const result = await admin<AdminBatchPreview>('previewBatch', { batchId: batch.id });
@@ -228,45 +248,60 @@ export default function AdminGamesScreen() {
   };
 
   return (
-    <Screen onScrollPosition={selected ? undefined : handleCatalogueScroll} refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}>
-      <Header eyebrow="ADMIN" title={selected ? selected.game.eventTitle : 'Games'} />
+    <>
+    <ListScreen
+      bottomAccessoryHeight={batch?.signals.length ? reviewHeight + spacing.md : 0}
+      data={games?.items ?? []}
+      keyExtractor={(game) => game.id}
+      initialNumToRender={8}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      onEndReached={() => { if (!catalogueLoading && !catalogueLoadingMore && games?.items.length) loadNextGames(); }}
+      onEndReachedThreshold={0.4}
+      refreshControl={<RefreshControl refreshing={catalogueLoading} onRefresh={() => void loadGames(query, dateFilter, competition)} tintColor={theme.accent} />}
+      ListHeaderComponent={<View style={{ gap: spacing.md }}>
+        <Header eyebrow="ADMIN" title="Games" />
+        {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
+        <View style={[styles.search, { backgroundColor: theme.field, borderColor: theme.border }]}><MagnifyingGlass color={theme.textMuted} size={18} /><TextInput accessibilityLabel="Search upcoming games" onChangeText={setQuery} placeholder="Search teams" placeholderTextColor={theme.textMuted} style={[styles.searchInput, { color: theme.text }]} value={query} /></View>
+        <ScrollView contentContainerStyle={styles.chips} horizontal showsHorizontalScrollIndicator={false}>
+          {(['TODAY', 'TOMORROW', 'WEEK'] as const).map((filter) => <FilterChip active={dateFilter === filter} key={filter} label={filter === 'TODAY' ? 'Today' : filter === 'TOMORROW' ? 'Tomorrow' : 'Next 7 days'} onPress={() => setDateFilter(filter)} />)}
+        </ScrollView>
+        {games?.leagues.length ? <ScrollView contentContainerStyle={styles.chips} horizontal showsHorizontalScrollIndicator={false}>
+          <FilterChip active={competition === null} label="All leagues" onPress={() => setCompetition(null)} />
+          {games.leagues.map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(item)} />)}
+        </ScrollView> : null}
+        <ResourceState error={catalogueError} />
+        <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Refreshing games…' : `${games?.items.length ?? 0} games loaded`}</Text>
+      </View>}
+      renderItem={({ item: game }) => <FixtureCard game={game} onPress={() => void openGame(game)} selected={Boolean(batch?.signals.some((signal) => signal.eventTitle === game.eventTitle && signal.kickoff === game.kickoff))} />}
+      ListEmptyComponent={!catalogueHydrated || catalogueLoading ? <AdminGamesListSkeleton /> : <EmptyState detail={games?.nextCursor ? 'Load more to continue searching this date range.' : 'Try another team, date, or competition.'} title={games?.nextCursor ? 'No matches on this page' : 'No matching games'} />}
+      ListFooterComponent={<View style={{ gap: spacing.md }}>
+        {games?.nextCursor ? <ActionButton label="Load more games" loading={catalogueLoadingMore} onPress={loadNextGames} variant="secondary" /> : null}
+        {drafts.data?.some((item) => item.id !== batch?.id) ? <View style={{ gap: spacing.sm }}><Text style={[styles.sectionTitle, { color: theme.text }]}>Saved drafts</Text>{drafts.data.filter((item) => item.id !== batch?.id).map((item) => <PressableScale accessibilityLabel={`Open ${item.title ?? 'draft'}`} accessibilityRole="button" key={item.id} onPress={() => void loadBatch(item.id)}><View style={[styles.game, { borderBottomColor: theme.border }]}><Text style={[styles.gameTitle, { color: theme.text }]}>{item.title ?? 'Untitled draft'}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{item.signalCount}</Text></View></PressableScale>)}</View> : null}
+      </View>}
+    />
+    {selected ? <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]}>
+      <Screen bottomAccessoryHeight={batch?.signals.length ? reviewHeight + spacing.md : 0}>
+        <PressableScale accessibilityLabel="Back to games" accessibilityRole="button" onPress={() => { gameRequest.current++; setSelected(null); }}><View style={styles.back}><ArrowLeft color={theme.text} size={18} /><Text style={[styles.backText, { color: theme.text }]}>All games</Text></View></PressableScale>
+        <FixtureCard game={selected.game} />
+        {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
+        {selected.markets.map((market) => <Card key={market.type}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{market.label}</Text>
+          <View style={styles.outcomes}>{market.outcomes.map((outcome) => <PressableScale disabled={busy} accessibilityLabel={`Select ${outcome.selectionLabel} at ${cents(outcome.currentPrice)}`} accessibilityRole="button" key={`${outcome.conditionId}:${outcome.tokenId}`} onPress={() => void addOutcome(outcome)}><View style={[styles.outcome, { backgroundColor: theme.field, borderColor: theme.border }]}><Text style={[styles.outcomeLabel, { color: theme.text }]}>{outcome.selectionLabel}</Text><Text style={[styles.price, { color: theme.accent }]}>{cents(outcome.currentPrice)}</Text><Plus color={theme.accent} size={16} /></View></PressableScale>)}</View>
+        </Card>)}
+      </Screen>
+    </View> : null}
+
+    {batch?.signals.length ? <View onLayout={({ nativeEvent }) => setReviewHeight(nativeEvent.layout.height)} pointerEvents="box-none" style={[styles.reviewHost, { bottom: navigationHeight + spacing.md }]}><ActionButton label={`Review · ${batch.signals.length}`} onPress={() => reviewSheet.current?.present()} /></View> : null}
+    <AppBottomSheet onDismiss={() => undefined} ref={reviewSheet} title={`Review · ${batch?.signals.length ?? 0}`}>
       {message ? <Text accessibilityLiveRegion="polite" style={[styles.message, { color: theme.textMuted }]}>{message}</Text> : null}
-
-      {selected ? (
-        <>
-          <PressableScale accessibilityLabel="Back to games" accessibilityRole="button" onPress={() => setSelected(null)}><View style={styles.back}><ArrowLeft color={theme.text} size={18} /><Text style={[styles.backText, { color: theme.text }]}>All games</Text></View></PressableScale>
-          <Text style={[styles.meta, { color: theme.textMuted }]}>{selected.game.competition ?? 'Football'} · {new Date(selected.game.kickoff).toLocaleString()}</Text>
-          {selected.markets.map((market) => <View key={market.type} style={styles.marketGroup}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>{market.label}</Text>
-            <View style={styles.outcomes}>{market.outcomes.map((outcome) => <PressableScale accessibilityLabel={`Select ${outcome.selectionLabel} at ${cents(outcome.currentPrice)}`} accessibilityRole="button" key={`${outcome.conditionId}:${outcome.tokenId}`} onPress={() => void addOutcome(outcome)}><View style={[styles.outcome, { backgroundColor: theme.panel, borderColor: theme.border }]}><Text style={[styles.outcomeLabel, { color: theme.text }]}>{outcome.selectionLabel}</Text><Text style={[styles.price, { color: theme.textMuted }]}>{cents(outcome.currentPrice)}</Text></View></PressableScale>)}</View>
-          </View>)}
-        </>
-      ) : (
-        <>
-          <View style={[styles.search, { backgroundColor: theme.field, borderColor: theme.border }]}><MagnifyingGlass color={theme.textMuted} size={18} /><TextInput accessibilityLabel="Search upcoming games" onChangeText={setQuery} placeholder="Search teams" placeholderTextColor={theme.textMuted} style={[styles.searchInput, { color: theme.text }]} value={query} /></View>
-          <View style={styles.chips}>
-            {(['ALL', 'TODAY', 'TOMORROW'] as const).map((filter) => <FilterChip active={dateFilter === filter} key={filter} label={filter === 'ALL' ? '7 days' : filter === 'TODAY' ? 'Today' : 'Tomorrow'} onPress={() => setDateFilter(filter)} />)}
-            {competitions.slice(0, 4).map((item) => <FilterChip active={competition === item} key={item} label={item} onPress={() => setCompetition(competition === item ? null : item)} />)}
-          </View>
-          {!catalogueHydrated || (!games && catalogueLoading) ? <AdminGamesListSkeleton /> : <>
-            <ResourceState error={catalogueError} />
-            <Text style={[styles.meta, { color: theme.textMuted }]}>{catalogueLoading ? 'Refreshing games…' : `Showing ${games?.items.length ?? 0} of ${games?.total ?? 0} upcoming game${games?.total === 1 ? '' : 's'}`}</Text>
-            {(games?.items ?? []).map((game) => <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" key={game.id} onPress={() => void openGame(game)}><View style={[styles.game, { borderBottomColor: theme.border }]}><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{game.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{game.competition ?? 'Football'} · {new Date(game.kickoff).toLocaleString()}</Text></View><Plus color={theme.textMuted} size={19} /></View></PressableScale>)}
-            {games?.nextCursor ? <ActionButton label="Load more games" loading={catalogueLoadingMore} onPress={loadNextGames} variant="secondary" /> : null}
-            <View onLayout={({ nativeEvent }) => { catalogueEndY.current = nativeEvent.layout.y; }} />
-            {games && !games.items.length ? <EmptyState detail="Try another team, date, or competition." title="No matching games" /> : null}
-          </>}
-        </>
-      )}
-
-      <View style={styles.sectionHeader}><Text style={[styles.sectionTitle, { color: theme.text }]}>Review</Text><StatusPill label={`${batch?.signals.length ?? 0} selected`} tone={batch?.signals.length ? 'success' : 'neutral'} /></View>
       {batch?.signals.length ? <Card>
         {batch.signals.map((signal, index) => {
           const validation = preview?.validation.rows.find((row) => row.ordinal === signal.ordinal);
           const edit = editFor(signal);
           return <View key={signal.id} style={[styles.signal, { borderBottomColor: theme.border }]}>
             <View style={styles.signalHeader}><Text style={[styles.ordinal, { color: theme.textMuted }]}>{signal.ordinal}</Text><View style={styles.flex}><Text style={[styles.gameTitle, { color: theme.text }]}>{signal.eventTitle}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{signal.marketLabel} · {signal.selectionLabel}</Text></View><View style={styles.reorder}><IconButton disabled={index === 0 || busy} label="Move earlier" onPress={() => void moveSignal(signal.id, 'UP')}><ArrowUp color={theme.textMuted} size={17} /></IconButton><IconButton disabled={index === batch.signals.length - 1 || busy} label="Move later" onPress={() => void moveSignal(signal.id, 'DOWN')}><ArrowDown color={theme.textMuted} size={17} /></IconButton><IconButton disabled={busy} label="Remove selection" onPress={() => void removeSignal(signal.id)}><Trash color={theme.danger} size={17} /></IconButton></View></View>
-            <View style={styles.fields}><Field label="Maximum price (¢)" value={edit.maxPrice} onChange={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...edit, maxPrice: value } }))} /><Field label="Close before kickoff (min)" value={edit.expiryMinutes} onChange={(value) => setEdits((current) => ({ ...current, [signal.id]: { ...edit, expiryMinutes: value } }))} /></View>
+            <View style={styles.fields}><Field label="Maximum price (¢)" value={edit.maxPrice} onChange={(value) => { setPreview(null); setEdits((current) => ({ ...current, [signal.id]: { ...edit, maxPrice: value } })); }} /><Field label="Close before kickoff (min)" value={edit.expiryMinutes} onChange={(value) => { setPreview(null); setEdits((current) => ({ ...current, [signal.id]: { ...edit, expiryMinutes: value } })); }} /></View>
             <ActionButton icon={Check as never} label={signal.marketSnapshot?.priceConfirmed === true ? 'Price confirmed' : 'Confirm price'} loading={busy} onPress={() => void saveSignal(signal)} variant="secondary" />
             {validation && !validation.valid ? <Text style={[styles.error, { color: theme.danger }]}>{validation.errors.join(' ')}</Text> : null}
           </View>;
@@ -276,9 +311,20 @@ export default function AdminGamesScreen() {
 
       {preview ? <Card><Text style={[styles.sectionTitle, { color: theme.text }]}>Publish preview</Text><View style={styles.previewGrid}><PreviewFact label="Test recipients" value={String(preview.testUsers)} /><PreviewFact label="Live recipients" value={String(preview.liveUsers)} /><PreviewFact label="Test exposure" value={money(preview.testExposureUsdc)} /><PreviewFact label="Funded exposure" value={money(preview.liveExposureUsdc)} /><PreviewFact label="Blocked" value={String(preview.blockedUsers)} /><PreviewFact label="Total exposure" value={money(preview.aggregateExposureUsdc)} /></View>{preview.blockedByCode.length ? <Text style={[styles.meta, { color: theme.textMuted }]}>{preview.blockedByCode.map((item) => `${item.count} ${item.code.toLowerCase().replaceAll('_', ' ')}`).join(' · ')}</Text> : null}<ActionButton disabled={!preview.validation.publishable} label="Authenticate & publish" loading={busy} onPress={() => void publish()} /></Card> : null}
 
-      {drafts.data?.some((item) => item.id !== batch?.id) ? <View><Text style={[styles.sectionTitle, { color: theme.text }]}>Saved drafts</Text>{drafts.data.filter((item) => item.id !== batch?.id).map((item) => <PressableScale accessibilityLabel={`Open ${item.title ?? 'draft'}`} accessibilityRole="button" key={item.id} onPress={() => void loadBatch(item.id)}><View style={[styles.game, { borderBottomColor: theme.border }]}><Text style={[styles.gameTitle, { color: theme.text }]}>{item.title ?? 'Untitled draft'}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{item.signalCount}</Text></View></PressableScale>)}</View> : null}
-    </Screen>
+    </AppBottomSheet>
+    </>
   );
+}
+
+function FixtureCard({ game, onPress, selected = false }: { game: AdminFootballGame; onPress?: () => void; selected?: boolean }) {
+  const { theme } = usePolyClawTheme();
+  const content = <View style={[styles.fixture, { backgroundColor: theme.panel, borderColor: selected ? theme.accent : theme.border }]}>
+    <View style={styles.fixtureMeta}><Text numberOfLines={1} style={[styles.meta, styles.flex, { color: theme.textMuted }]}>{game.competition ?? 'Football'}</Text><Text style={[styles.meta, { color: theme.textMuted }]}>{new Date(game.kickoff).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>{selected ? <Check color={theme.accent} size={18} /> : null}</View>
+    {[game.homeTeam, game.awayTeam].map((team, index) => <View key={`${team}:${index}`} style={styles.teamRow}><View style={[styles.teamBadge, { backgroundColor: theme.field }]}><Text style={[styles.teamInitial, { color: theme.accent }]}>{team.split(' ').map((word) => word[0]).slice(0, 2).join('')}</Text></View><Text style={[styles.teamName, { color: theme.text }]}>{team}</Text></View>)}
+    <View style={styles.fixturePrices}>{game.prices?.length ? game.prices.map((price) => <View key={price.label} style={[styles.priceChip, { backgroundColor: theme.field }]}><Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted }]}>{price.label}</Text><Text style={[styles.price, { color: theme.accent }]}>{cents(price.price)}</Text></View>) : <Text style={[styles.meta, { color: theme.textMuted }]}>{game.marketTypes.length} market groups</Text>}</View>
+    <Text style={[styles.meta, { color: theme.textMuted }]}>{new Date(game.kickoff).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · {onPress ? 'View markets' : 'Choose one outcome below'}</Text>
+  </View>;
+  return onPress ? <PressableScale accessibilityLabel={`Open ${game.eventTitle}`} accessibilityRole="button" onPress={onPress}>{content}</PressableScale> : content;
 }
 
 function FilterChip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
@@ -292,7 +338,7 @@ function IconButton({ children, disabled, label, onPress }: { children: ReactNod
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const { theme } = usePolyClawTheme();
-  return <View style={styles.field}><Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{label}</Text><TextInput accessibilityLabel={label} keyboardType="number-pad" onChangeText={onChange} style={[styles.input, { borderColor: theme.border, color: theme.text }]} value={value} /></View>;
+  return <View style={styles.field}><Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{label}</Text><BottomSheetTextInput accessibilityLabel={label} keyboardType="decimal-pad" onChangeText={onChange} style={[styles.input, { borderColor: theme.border, color: theme.text }]} value={value} /></View>;
 }
 
 function PreviewFact({ label, value }: { label: string; value: string }) {
@@ -301,14 +347,23 @@ function PreviewFact({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  fixture: { padding: spacing.lg, gap: spacing.sm, borderWidth: 1, borderRadius: radius.md },
+  fixtureMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  teamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  teamBadge: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  teamInitial: { fontFamily: fonts.bold, fontSize: 10 },
+  teamName: { flex: 1, fontFamily: fonts.semibold, fontSize: 16 },
+  fixturePrices: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  priceChip: { flex: 1, minWidth: 0, padding: spacing.sm, borderRadius: radius.sm, gap: 3 },
   back: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 44 }, backText: { fontFamily: fonts.semibold, fontSize: 14 },
-  chip: { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.md }, chipText: { fontFamily: fonts.semibold, fontSize: 12 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 44, paddingHorizontal: spacing.md }, chipText: { fontFamily: fonts.semibold, fontSize: 12 }, chips: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   error: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 18 }, field: { flex: 1, gap: 6 }, fieldLabel: { fontFamily: fonts.medium, fontSize: 11.5 }, fields: { flexDirection: 'row', gap: spacing.sm }, flex: { flex: 1, minWidth: 0 },
   game: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 68, paddingVertical: spacing.md }, gameTitle: { fontFamily: fonts.semibold, fontSize: 14.5, lineHeight: 20 },
   iconButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 36 }, input: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.semibold, fontSize: 15, minHeight: 44, paddingHorizontal: spacing.sm, ...numeric },
   marketGroup: { gap: spacing.sm }, message: { fontFamily: fonts.medium, fontSize: 12.5, lineHeight: 18 }, meta: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, ...numeric }, ordinal: { fontFamily: fonts.bold, fontSize: 12, paddingTop: 3, width: 18 },
   outcome: { alignItems: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between', minHeight: 52, paddingHorizontal: spacing.md }, outcomeLabel: { flex: 1, fontFamily: fonts.semibold, fontSize: 13.5 }, outcomes: { gap: spacing.sm }, price: { fontFamily: fonts.bold, fontSize: 13.5, ...numeric },
   previewFact: { gap: 3, minWidth: '44%' }, previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }, previewValue: { fontFamily: fonts.bold, fontSize: 18, ...numeric }, reorder: { flexDirection: 'row' },
+  reviewHost: { left: spacing.lg, position: 'absolute', right: spacing.lg, zIndex: 20 },
   search: { alignItems: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, minHeight: 48, paddingHorizontal: spacing.md }, searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, minHeight: 46 },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg }, sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 }, signal: { borderBottomWidth: StyleSheet.hairlineWidth, gap: spacing.md, paddingVertical: spacing.md }, signalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.xs },
+  sectionTitle: { fontFamily: fonts.semibold, fontSize: 17 }, signal: { borderBottomWidth: StyleSheet.hairlineWidth, gap: spacing.md, paddingVertical: spacing.md }, signalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.xs },
 });

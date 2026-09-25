@@ -67,12 +67,12 @@ export function useAccountController() {
   }, [account.data?.access?.mode, userId]);
 
   useEffect(() => {
-    if (!depositWalletAddress || !session || !account.data?.liveCanaryAllowed) return;
+    if (!depositWalletAddress || !session || !account.data?.walletSetupAvailable) return;
     const poll = () => consumer('depositStatus').then(() => refreshAccount()).catch(() => undefined);
     const timer = setInterval(() => void poll(), 15_000);
     void poll();
     return () => clearInterval(timer);
-  }, [account.data?.liveCanaryAllowed, depositWalletAddress, session, consumer, refreshAccount]);
+  }, [account.data?.walletSetupAvailable, depositWalletAddress, session, consumer, refreshAccount]);
 
   const readOnly = Boolean(account.error || dashboard.error);
   const run = async (name: BusyOperation, operation: () => Promise<unknown>, success: string) => {

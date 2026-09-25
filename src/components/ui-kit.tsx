@@ -1,19 +1,30 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import type { LucideIcon } from '@/components/modern-icons';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, View, useWindowDimensions, type FlatListProps, type PressableProps, type RefreshControlProps, type ViewProps } from 'react-native';
 import type { ReactElement, ReactNode } from 'react';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts, layout, radius, spacing, usePolyClawTheme, type Theme } from '@/theme';
 import { haptics, PulsingDot, PressableScale, Skeleton, Staggered, Ticker } from './motion';
+import { useBottomClearance } from './bottom-clearance';
 
 const glassAvailable = isGlassEffectAPIAvailable();
 
-export function Screen({ children, refreshControl, onScrollPosition }: { children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps>; onScrollPosition?: (offsetY: number, viewportHeight: number) => void }) {
+export function Screen({ children, refreshControl, onScrollPosition, bottomAccessoryHeight = 0 }: { bottomAccessoryHeight?: number; children: React.ReactNode; refreshControl?: ReactElement<RefreshControlProps>; onScrollPosition?: (offsetY: number, viewportHeight: number) => void }) {
   const { theme } = usePolyClawTheme();
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { height } = useBottomClearance();
   const gutter = width >= layout.largeScreenBreakpoint ? spacing.xl : spacing.lg;
-  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: gutter, paddingBottom: Math.max(130, insets.bottom + 96) }]} onScroll={onScrollPosition ? ({ nativeEvent }) => onScrollPosition(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height) : undefined} refreshControl={refreshControl} scrollEventThrottle={onScrollPosition ? 100 : undefined}>{children}</ScrollView></SafeAreaView>;
+  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}><ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: gutter, paddingBottom: height + bottomAccessoryHeight + spacing.xl }]} onScroll={onScrollPosition ? ({ nativeEvent }) => onScrollPosition(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height) : undefined} refreshControl={refreshControl} scrollEventThrottle={onScrollPosition ? 100 : undefined}>{children}</ScrollView></SafeAreaView>;
+}
+
+/** A virtualized screen with the same gutters and measured navigation clearance. */
+export function ListScreen<T>({ bottomAccessoryHeight = 0, contentContainerStyle, ...props }: FlatListProps<T> & { bottomAccessoryHeight?: number }) {
+  const { theme } = usePolyClawTheme();
+  const { height } = useBottomClearance();
+  const { width } = useWindowDimensions();
+  return <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: theme.background }]}>
+    <FlatList {...props} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.screen, { paddingHorizontal: width >= layout.largeScreenBreakpoint ? spacing.xl : spacing.lg, paddingBottom: height + bottomAccessoryHeight + spacing.xl }, contentContainerStyle]} />
+  </SafeAreaView>;
 }
 
 export function Header({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
@@ -133,11 +144,11 @@ export { money, percent, shortDate } from '@/lib/format';
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  screen: { paddingVertical: spacing.lg, paddingBottom: 130, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  screen: { paddingVertical: spacing.lg, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
   header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12 },
   eyebrow: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1.8, marginBottom: 5 },
   title: { fontFamily: fonts.displayExtraBold, fontSize: 30, letterSpacing: -1.2 },
-  card: { borderWidth: 1, borderRadius: radius.md, padding: spacing.lg },
+  card: { gap: spacing.md, borderWidth: 1, borderRadius: radius.md, padding: spacing.lg },
   raised: { borderWidth: StyleSheet.hairlineWidth },
   glass: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(140,140,160,0.24)' },
   pill: { paddingHorizontal: 10, paddingVertical: 6, minHeight: 28, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 1 },

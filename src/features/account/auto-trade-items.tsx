@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Lightning, Pause, Play } from 'phosphor-react-native';
@@ -27,6 +27,13 @@ export function AutoTradeItem() {
   const data = resource.data;
   const limits = data?.limits;
   const consent = data?.consent;
+  const edited = useRef(false);
+  useEffect(() => {
+    if (limits && !edited.current) {
+      setPerTrade(String(limits.requestedPerTradeUsdc ?? limits.perTradeUsdc));
+      setDaily(String(limits.requestedDailyUsdc ?? limits.dailyUsdc));
+    }
+  }, [limits]);
 
   const run = async <T,>(action: () => Promise<T>, note: string | ((result: T) => string)) => {
     setBusy(true);
@@ -43,11 +50,11 @@ export function AutoTradeItem() {
   };
 
   const saveLimits = async () => {
-    const per = Number(perTrade || (limits?.requestedPerTradeUsdc ?? limits?.perTradeUsdc ?? 0));
-    const day = Number(daily || (limits?.requestedDailyUsdc ?? limits?.dailyUsdc ?? 0));
+    const per = Number(perTrade);
+    const day = Number(daily);
     if (!Number.isFinite(per) || !Number.isFinite(day) || per <= 0 || day <= 0) { setMessage('Enter a valid per-trade and daily amount.'); return; }
-    if (per < 1 || per > (limits?.platformMaxTradeUsdc ?? 25)) { setMessage(`Per-trade limit must be between $1 and $${limits?.platformMaxTradeUsdc ?? 25}.`); return; }
-    if (day < per || day > (limits?.platformMaxDayUsdc ?? 100)) { setMessage(`Daily limit must be at least the per-trade amount and no more than $${limits?.platformMaxDayUsdc ?? 100}.`); return; }
+    if (per < 1) { setMessage('Per-trade amount must be at least $1.'); return; }
+    if (day < per) { setMessage('Daily amount must be at least the per-trade amount.'); return; }
     await run(async () => {
       if (!consent?.fresh) await consumer('acceptCopyConsent', { version: consent?.currentVersion ?? 1, accepted: true });
       await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
@@ -114,7 +121,7 @@ export function AutoTradeItem() {
               onPress={() => setMode(mode)}
               style={[hostStyles.modeOption, active && { backgroundColor: theme.panel }]}
             >
-              <Text style={[hostStyles.modeLabel, { color: active ? theme.text : theme.textMuted }]}>{mode === 'PAPER' ? 'Test' : unavailable ? 'Live · soon' : 'Live'}</Text>
+              <Text style={[hostStyles.modeLabel, { color: active ? theme.text : theme.textMuted }]}>{mode === 'PAPER' ? 'Test' : 'Live'}</Text>
             </Pressable>
           );
         })}
@@ -127,8 +134,8 @@ export function AutoTradeItem() {
       {data && data.liveAccess?.available !== true ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{data.liveAccess?.reason ?? 'Live trading is not available for this account yet.'}</Text> : null}
       {limits ? (
         <Text style={[styles.footnote, { color: theme.textMuted }]}>
-          {money(limits.dailyUsedUsdc)} used · {money(limits.dailyRemainingUsdc)} remaining · next trade up to {money(limits.approvedStakePreviewUsdc)}.{`\n`}
-          Platform maximum: {money(limits.platformMaxTradeUsdc)} per trade and {money(limits.platformMaxDayUsdc)} per UTC day. Resets {new Date(limits.resetsAt).toLocaleString()}.
+          {money(limits.dailyUsedUsdc)} used · {money(limits.dailyRemainingUsdc)} remaining · next full trade {money(limits.approvedStakePreviewUsdc)}.{`\n`}
+          Your saved authorization does not change unless you edit it. Resets {new Date(limits.resetsAt).toLocaleString()}.
         </Text>
       ) : null}
       {message ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{message}</Text> : null}
@@ -138,7 +145,7 @@ export function AutoTradeItem() {
           <TextInput
             accessibilityLabel="Per trade amount in USDC"
             keyboardType="decimal-pad"
-            onChangeText={setPerTrade}
+            onChangeText={(value) => { edited.current = true; setPerTrade(value); }}
             placeholder={String(limits?.requestedPerTradeUsdc ?? limits?.perTradeUsdc ?? 5)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
@@ -150,7 +157,7 @@ export function AutoTradeItem() {
           <TextInput
             accessibilityLabel="Daily amount in USDC"
             keyboardType="decimal-pad"
-            onChangeText={setDaily}
+            onChangeText={(value) => { edited.current = true; setDaily(value); }}
             placeholder={String(limits?.requestedDailyUsdc ?? limits?.dailyUsdc ?? 15)}
             placeholderTextColor={theme.textMuted}
             style={[hostStyles.input, { borderColor: theme.border, color: theme.text }]}
