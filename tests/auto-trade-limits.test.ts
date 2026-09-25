@@ -33,4 +33,10 @@ describe('user-controlled Auto-trade limits', () => {
     assert.match(accountLimits, /linked Polymarket wallet remains read-only/);
     assert.match(accountLimits, /autoTradeModeNotice/);
   });
+
+  it('keeps Account render-safe while a newly added live-access field is absent', () => {
+    assert.match(accountLimits, /data\?\.liveAccess\?\.available/);
+    assert.doesNotMatch(accountLimits, /data\?\.liveAccess\.available/);
+    assert.doesNotMatch(accountLimits, /data\?\.limits\./);
+  });
 });

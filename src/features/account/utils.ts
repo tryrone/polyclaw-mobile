@@ -62,21 +62,21 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
   const approval = account?.approval;
   const botReasons = approval?.botReasons ?? [];
   const reviewReasons = approval?.reviewMissingReasons ?? [];
-  const accessDetail = account?.access.active
-    ? account.access.pilotGrant?.expiresAt
+  const accessDetail = account?.access?.active
+    ? account.access?.pilotGrant?.expiresAt
       ? `Active until ${new Date(account.access.pilotGrant.expiresAt).toLocaleDateString()}`
       : 'Active access confirmed'
-    : account?.access.mode === 'SUBSCRIPTION'
+    : account?.access?.mode === 'SUBSCRIPTION'
       ? 'An active subscription is required for new bot positions'
-      : account?.access.pilotRequest?.status === 'PENDING'
+      : account?.access?.pilotRequest?.status === 'PENDING'
       ? 'Renewal request is waiting for an admin'
       : 'Request a pilot grant to continue';
   return [
     {
       id: 'access',
-      label: account?.access.mode === 'SUBSCRIPTION' ? 'Active subscription access' : 'Active pilot access',
+      label: account?.access?.mode === 'SUBSCRIPTION' ? 'Active subscription access' : 'Active pilot access',
       detail: accessDetail,
-      passed: Boolean(account?.access.active),
+      passed: Boolean(account?.access?.active),
     },
     {
       id: 'disclosures',

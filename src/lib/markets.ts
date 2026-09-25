@@ -7,6 +7,27 @@ export function isDoubleChance(value: string | null | undefined): value is keyof
 export function marketLabel(value: string) {
   return isDoubleChance(value) ? DOUBLE_CHANCE[value] : value;
 }
+
+/** Keeps the outcome and numeric line together in compact customer-facing trade text. */
+export function tradeSelectionLabel(marketValue?: string | null, selectionValue?: string | null) {
+  const market = marketValue?.trim() ?? '';
+  const selection = selectionValue?.trim() ?? '';
+  const unit = /corner/i.test(market) ? 'corners' : /card/i.test(market) ? 'cards' : 'goals';
+  const shorthand = selection.match(/^(over|under|o|u)\s*(\d+(?:\.\d+)?)$/i);
+  if (shorthand) {
+    const side = /^o(?:ver)?$/i.test(shorthand[1]!) ? 'Over' : 'Under';
+    return `${side} ${shorthand[2]} ${unit}`;
+  }
+  const totalSide = selection.match(/^(over|under)$/i);
+  const totalLine = market.match(/\b(\d+(?:\.\d+)?)\b/);
+  if (totalSide && totalLine && /over\s*[/&-]?\s*under|total(?:\s+goals)?/i.test(market)) {
+    const side = totalSide[1]!.toLowerCase() === 'over' ? 'Over' : 'Under';
+    return `${side} ${totalLine[1]} ${unit}`;
+  }
+  if (!market) return selection || 'Selection unavailable';
+  if (!selection || market.toLowerCase().includes(selection.toLowerCase())) return market;
+  return `${market} · ${selection}`;
+}
 /** Decimal return includes stake, before fees; missing quotes are unavailable. */
 export function decimalOdds(price: number | null | undefined) {
   return price != null && Number.isFinite(price) && price > 0 && price < 1 ? (1 / price).toFixed(2) : '—';

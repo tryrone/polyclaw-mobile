@@ -23,4 +23,10 @@ describe('consumer trade detail', () => {
     assert.match(tradeScreen, /label="Open on Polymarket"/);
     assert.match(tradeScreen, /Linking\.openURL\(detail\.polymarketUrl!\)/);
   });
+
+  it('shows the complete market and selected outcome in rows and detail', () => {
+    assert.match(tradeScreen, /tradeSelectionLabel\(row\.marketLabel, row\.selectionLabel\)/);
+    assert.match(tradeScreen, /\['Trade', tradeSelectionLabel\(detail\.marketLabel, detail\.selectionLabel\)\]/);
+    assert.match(tradeScreen, /\['Market', detail\.marketLabel\]/);
+  });
 });

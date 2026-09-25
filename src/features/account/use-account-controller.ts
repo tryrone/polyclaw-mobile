@@ -48,7 +48,7 @@ export function useAccountController() {
   const userId = session?.user.id;
 
   useEffect(() => {
-    if (!userId || account.data?.access.mode === 'PILOT' || !account.data?.access.mode) return;
+    if (!userId || account.data?.access?.mode === 'PILOT' || !account.data?.access?.mode) return;
     let cleanup: (() => boolean) | undefined;
     void getPolyClawSubscription(userId)
       .then((state) => {
@@ -64,7 +64,7 @@ export function useAccountController() {
     return () => {
       cleanup?.();
     };
-  }, [account.data?.access.mode, userId]);
+  }, [account.data?.access?.mode, userId]);
 
   useEffect(() => {
     if (!depositWalletAddress || !session || !account.data?.liveCanaryAllowed) return;
@@ -125,7 +125,7 @@ export function useAccountController() {
 
   const checklist = useMemo(() => buildApprovalChecklist(account.data ?? undefined), [account.data]);
   const readiness = checklist.filter((item) => item.passed).length;
-  const riskQuizRequired = Boolean(account.data?.approval.botReasons.includes('risk_quiz_required'));
+  const riskQuizRequired = Boolean(account.data?.approval?.botReasons?.includes('risk_quiz_required'));
 
   const toggleSection = (section: AccountSectionKey) => {
     setExpanded((current) => (current === section ? null : section));
@@ -161,7 +161,7 @@ export function useAccountController() {
       toggleSection,
     },
     subscription: {
-      visible: Boolean(account.data && account.data.access.mode !== 'PILOT'),
+      visible: Boolean(account.data && account.data.access?.mode !== 'PILOT'),
       active: Boolean(dashboard.data?.entitlement?.active || storeActive),
       price,
       purchase: () => run('purchase', () => billing('purchase'), 'Subscription confirmed. Server access will refresh shortly.'),
@@ -218,7 +218,7 @@ export function useAccountController() {
     approval: {
       checklist,
       readiness,
-      reviewReady: Boolean(account.data?.approval.reviewReady),
+      reviewReady: Boolean(account.data?.approval?.reviewReady),
       status: account.data?.approvalStatus,
       riskAcknowledgements,
       riskQuizRequired,
