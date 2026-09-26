@@ -67,7 +67,7 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
       ? `Active until ${new Date(account.access.pilotGrant.expiresAt).toLocaleDateString()}`
       : 'Active access confirmed'
     : account?.access?.mode === 'SUBSCRIPTION'
-      ? 'An active subscription is required for new bot positions'
+      ? 'Active PolyClaw access is required for new bot positions'
       : account?.access?.pilotRequest?.status === 'PENDING'
       ? 'Renewal request is waiting for an admin'
       : 'Request a pilot grant to continue';

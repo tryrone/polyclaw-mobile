@@ -58,7 +58,7 @@ export const AppBottomSheet = forwardRef<AppBottomSheetHandle, Props>(function A
       android_keyboardInputMode="adjustResize"
       backdropComponent={renderBackdrop}
       backgroundStyle={{ backgroundColor: theme.panel }}
-      bottomInset={Math.max(insets.bottom, spacing.sm)}
+      bottomInset={0}
       enableDismissOnClose
       enableDynamicSizing={false}
       enablePanDownToClose
@@ -69,11 +69,14 @@ export const AppBottomSheet = forwardRef<AppBottomSheetHandle, Props>(function A
       onDismiss={onDismiss}
       overrideReduceMotion={ReduceMotion.System}
       ref={modalRef}
+      topInset={insets.top}
       snapPoints={snapPoints}>
       <BottomSheetScrollView
         accessibilityLabel={`${title} sheet`}
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}
+        // Keep the surface flush with the screen; protect content inside the sheet.
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}
         keyboardDismissMode="interactive"
+        scrollIndicatorInsets={{ bottom: insets.bottom }}
         keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{title}</Text>
