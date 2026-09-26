@@ -1,4 +1,5 @@
 import { randomUUID } from 'expo-crypto';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRef, useState } from 'react';
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -76,7 +77,20 @@ export default function AdminTradesScreen() {
     }
   };
 
-  const confirmCancellation = (batchId: string) => {
+  const confirmCancellation = async (batchId: string) => {
+    const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
+    if (!hardware || !enrolled) {
+      Alert.alert('Device authentication required', 'Set up Face ID, Touch ID, or device authentication before cancelling.');
+      return;
+    }
+    const authentication = await LocalAuthentication.authenticateAsync({ promptMessage: 'Cancel PolyClaw batch', cancelLabel: 'Cancel', disableDeviceFallback: false });
+    if (!authentication.success) return;
+    try {
+      await admin('recordDeviceAuth');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Device authentication could not be confirmed.');
+      return;
+    }
     Alert.alert(
       'Cancel this batch?',
       `${detail?.cancellationScope ? `${detail.cancellationScope.orders} unfilled orders across ${detail.cancellationScope.users} users and ${detail.cancellationScope.selections} selections. ` : ''}This affects the entire batch, including other users. Filled positions remain open for settlement.`,

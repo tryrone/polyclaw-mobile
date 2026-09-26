@@ -58,7 +58,7 @@ export async function consumerRequest<T>(accessToken: string, procedure: Consume
 }
 
 /** Admin-directed auto-trading operator procedures (`polyClawAdmin` router). */
-export type AdminProcedure = 'catalogueSearch' | 'catalogueGames' | 'catalogueGameMarkets' | 'listBatches' | 'getBatch' | 'createDraft' | 'addSignal' | 'updateSignal' | 'removeSignal' | 'moveSignal' | 'discardDraft' | 'validateBatch' | 'previewBatch' | 'publishBatch' | 'cancelBatch' | 'deliverySummary' | 'listDeliveries' | 'tradeDetail' | 'tradePerformance' | 'dispatchBatch' | 'dispatchDelivery' | 'expireStaleSignals' | 'eligibilityDirectory' | 'publisherStatus' | 'listPublishers' | 'publisherAudit' | 'grantPublisher' | 'revokePublisher' | 'platformControl' | 'setGlobalPause' | 'connections';
+export type AdminProcedure = 'catalogueSearch' | 'catalogueGames' | 'catalogueGameMarkets' | 'listBatches' | 'getBatch' | 'createDraft' | 'addSignal' | 'updateSignal' | 'removeSignal' | 'moveSignal' | 'discardDraft' | 'validateBatch' | 'previewBatch' | 'publishBatch' | 'cancelBatch' | 'recordDeviceAuth' | 'deliverySummary' | 'listDeliveries' | 'tradeDetail' | 'tradePerformance' | 'dispatchBatch' | 'dispatchDelivery' | 'expireStaleSignals' | 'eligibilityDirectory' | 'publisherStatus' | 'listPublishers' | 'publisherAudit' | 'grantPublisher' | 'revokePublisher' | 'platformControl' | 'setGlobalPause' | 'connections';
 
 const adminQueries = new Set<AdminProcedure>(['catalogueSearch', 'catalogueGames', 'catalogueGameMarkets', 'listBatches', 'getBatch', 'validateBatch', 'previewBatch', 'deliverySummary', 'listDeliveries', 'tradeDetail', 'tradePerformance', 'eligibilityDirectory', 'publisherStatus', 'listPublishers', 'publisherAudit', 'platformControl', 'connections']);
 

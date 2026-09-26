@@ -233,6 +233,12 @@ export default function AdminGamesScreen() {
     }
     const authentication = await LocalAuthentication.authenticateAsync({ promptMessage: 'Publish PolyClaw trades', cancelLabel: 'Cancel', disableDeviceFallback: false });
     if (!authentication.success) return;
+    try {
+      await admin('recordDeviceAuth');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Device authentication could not be confirmed.');
+      return;
+    }
     Alert.alert('Publish immutable batch?', `${batch.signals.length} selection${batch.signals.length === 1 ? '' : 's'} · ${preview.testUsers} Test and ${preview.liveUsers} Live recipients · up to ${money(preview.aggregateExposureUsdc)} aggregate exposure.`, [
       { text: 'Keep reviewing', style: 'cancel' },
       { text: 'Publish', style: 'destructive', onPress: async () => {
