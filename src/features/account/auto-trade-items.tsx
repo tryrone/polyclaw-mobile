@@ -63,13 +63,19 @@ export function AutoTradeItem() {
 
   const toggle = () => {
     if (data?.enabled) void run(() => consumer('pauseAutoTrade', { reason: 'Paused from Account' }), 'Auto-trade paused.');
-    else void run(() => consumer('enableAutoTrade'), 'Auto-trade enabled.');
+    else void run(async () => {
+      if (data?.executionMode === 'LIVE') await consumer('refreshTradingLocation');
+      return consumer('enableAutoTrade');
+    }, 'Auto-trade enabled.');
   };
 
   const setMode = (mode: 'PAPER' | 'LIVE') => {
     if (!data || data.executionMode === mode) return;
     const apply = () => void run(
-      () => consumer<AutoTradeModeResult>('configureAutoTradeMode', { mode }),
+      async () => {
+        if (mode === 'LIVE') await consumer('refreshTradingLocation');
+        return consumer<AutoTradeModeResult>('configureAutoTradeMode', { mode });
+      },
       (result) => autoTradeModeNotice(mode, result),
     );
     if (mode === 'LIVE') {
@@ -137,6 +143,11 @@ export function AutoTradeItem() {
           {money(limits.dailyUsedUsdc)} used · {money(limits.dailyRemainingUsdc)} remaining · next full trade {money(limits.approvedStakePreviewUsdc)}.{`\n`}
           Your saved authorization does not change unless you edit it. Resets {new Date(limits.resetsAt).toLocaleString()}.
         </Text>
+      ) : null}
+      {limits && (limits.requestedPerTradeUsdc !== limits.perTradeUsdc || limits.requestedDailyUsdc !== limits.dailyUsdc) ? (
+        <Text style={[styles.footnote, { color: theme.warning }]}>Your saved limits are {money(limits.requestedPerTradeUsdc)} per trade and {money(limits.requestedDailyUsdc)} per day. The live canary currently applies the lower platform caps: {money(limits.platformMaxTradeUsdc)} per trade and {money(limits.platformMaxDayUsdc)} per UTC day.</Text>
+      ) : limits ? (
+        <Text style={[styles.footnote, { color: theme.textMuted }]}>Effective platform caps are {money(limits.platformMaxTradeUsdc)} per trade and {money(limits.platformMaxDayUsdc)} per UTC day.</Text>
       ) : null}
       {message ? <Text style={[styles.footnote, { color: theme.textMuted }]}>{message}</Text> : null}
       <View style={hostStyles.fieldRow}>

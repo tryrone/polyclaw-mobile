@@ -1,6 +1,7 @@
 export type AccountSectionKey =
   | 'subscription'
   | 'wallet'
+  | 'polymarket'
   | 'approval'
   | 'signer'
   | 'notifications'

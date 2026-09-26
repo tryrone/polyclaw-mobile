@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
 import { useAuth } from '@/auth/provider';
 import type { ConsumerAutoTradeProcedure, ConsumerProcedure } from '@/lib/api';
 
 export function useConsumerResource<T>(procedure: ConsumerProcedure | ConsumerAutoTradeProcedure, input?: Record<string, unknown>, intervalMs = 30_000) {
-  const { consumer, state } = useAuth();
+  const { consumer, foregroundRefreshVersion, state } = useAuth();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,8 +17,7 @@ export function useConsumerResource<T>(procedure: ConsumerProcedure | ConsumerAu
   useEffect(() => {
     void Promise.resolve().then(refresh);
     const timer = setInterval(refresh, intervalMs);
-    const subscription = AppState.addEventListener('change', (next) => { if (next === 'active') void refresh(); });
-    return () => { clearInterval(timer); subscription.remove(); };
-  }, [intervalMs, refresh]);
+    return () => clearInterval(timer);
+  }, [foregroundRefreshVersion, intervalMs, refresh]);
   return { data, error, loading, refresh };
 }

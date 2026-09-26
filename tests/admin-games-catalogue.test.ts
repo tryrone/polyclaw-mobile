@@ -38,5 +38,8 @@ describe('admin games catalogue', () => {
     assert.match(adminGames, /LocalAuthentication\.authenticateAsync/);
     assert.match(adminGames, /Publish immutable batch/);
     assert.match(adminGames, /confirmed: true/);
+    assert.match(adminGames, /63208049-b836-46cb-8429-d896ff15b863/);
+    assert.match(adminGames, /Live canary confirmed/);
+    assert.match(adminGames, /liveRecipients/);
   });
 });

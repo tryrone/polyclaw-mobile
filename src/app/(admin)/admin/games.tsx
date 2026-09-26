@@ -18,6 +18,7 @@ type BatchView = AdminSignalBatch & { signals: AdminSignalRow[] };
 type DateFilter = 'TODAY' | 'TOMORROW' | 'WEEK';
 const SEARCH_DEBOUNCE_MS = 350;
 const GAMES_PAGE_SIZE = 20;
+const LIVE_CANARY_USER_ID = '63208049-b836-46cb-8429-d896ff15b863';
 
 function isoDate(offsetDays = 0) {
   const date = new Date();
@@ -226,6 +227,10 @@ export default function AdminGamesScreen() {
 
   const publish = async () => {
     if (!batch || !preview?.validation.publishable) return;
+    if (preview.liveRecipients.length > 0 && (preview.liveRecipients.length !== 1 || preview.liveRecipients[0]?.userId !== LIVE_CANARY_USER_ID)) {
+      setMessage('Live recipient check failed. The canary must include only the configured user.');
+      return;
+    }
     const [hardware, enrolled] = await Promise.all([LocalAuthentication.hasHardwareAsync(), LocalAuthentication.isEnrolledAsync()]);
     if (!hardware || !enrolled) {
       Alert.alert('Device authentication required', 'Set up Face ID, Touch ID, or device authentication before publishing.');
@@ -239,14 +244,17 @@ export default function AdminGamesScreen() {
       setMessage(error instanceof Error ? error.message : 'Device authentication could not be confirmed.');
       return;
     }
-    Alert.alert('Publish immutable batch?', `${batch.signals.length} selection${batch.signals.length === 1 ? '' : 's'} · ${preview.testUsers} Test and ${preview.liveUsers} Live recipients · up to ${money(preview.aggregateExposureUsdc)} aggregate exposure.`, [
+    const liveRecipientCopy = preview.liveRecipients.length === 1
+      ? `Only ${preview.liveRecipients[0].email ?? preview.liveRecipients[0].userId} (${preview.liveRecipients[0].userId}) will trade Live.`
+      : 'No account will trade Live in this publication.';
+    Alert.alert('Publish immutable batch?', `${batch.signals.length} selection${batch.signals.length === 1 ? '' : 's'} · ${preview.testUsers} Test and ${preview.liveUsers} Live recipients · up to ${money(preview.aggregateExposureUsdc)} aggregate exposure.\n\n${liveRecipientCopy}`, [
       { text: 'Keep reviewing', style: 'cancel' },
       { text: 'Publish', style: 'destructive', onPress: async () => {
         setBusy(true);
         try {
           await admin('publishBatch', { batchId: batch.id, idempotencyKey: randomUUID(), confirmed: true });
           setBatch(null); setPreview(null); setMessage('Published and dispatched. The minute worker will recover any interrupted delivery.');
-          await drafts.refresh();
+          await Promise.all([drafts.refresh(), admin('deliverySummary', { batchId: batch.id })]);
         } catch (error) { setMessage(error instanceof Error ? error.message : 'Publish failed.'); }
         finally { setBusy(false); }
       } },
@@ -315,7 +323,7 @@ export default function AdminGamesScreen() {
         <ActionButton label="Preview batch" loading={busy} onPress={() => void review()} variant="secondary" />
       </Card> : <EmptyState detail="Open a game, choose a market, then choose one outcome." title="No games selected" />}
 
-      {preview ? <Card><Text style={[styles.sectionTitle, { color: theme.text }]}>Publish preview</Text><View style={styles.previewGrid}><PreviewFact label="Test recipients" value={String(preview.testUsers)} /><PreviewFact label="Live recipients" value={String(preview.liveUsers)} /><PreviewFact label="Test exposure" value={money(preview.testExposureUsdc)} /><PreviewFact label="Funded exposure" value={money(preview.liveExposureUsdc)} /><PreviewFact label="Blocked" value={String(preview.blockedUsers)} /><PreviewFact label="Total exposure" value={money(preview.aggregateExposureUsdc)} /></View>{preview.blockedByCode.length ? <Text style={[styles.meta, { color: theme.textMuted }]}>{preview.blockedByCode.map((item) => `${item.count} ${item.code.toLowerCase().replaceAll('_', ' ')}`).join(' · ')}</Text> : null}<ActionButton disabled={!preview.validation.publishable} label="Authenticate & publish" loading={busy} onPress={() => void publish()} /></Card> : null}
+      {preview ? <Card><Text style={[styles.sectionTitle, { color: theme.text }]}>Publish preview</Text><View style={styles.previewGrid}><PreviewFact label="Test recipients" value={String(preview.testUsers)} /><PreviewFact label="Live recipients" value={String(preview.liveUsers)} /><PreviewFact label="Test exposure" value={money(preview.testExposureUsdc)} /><PreviewFact label="Funded exposure" value={money(preview.liveExposureUsdc)} /><PreviewFact label="Blocked" value={String(preview.blockedUsers)} /><PreviewFact label="Total exposure" value={money(preview.aggregateExposureUsdc)} /></View><Text style={[styles.meta, { color: preview.liveRecipients.length <= 1 && (preview.liveRecipients.length === 0 || preview.liveRecipients[0]?.userId === LIVE_CANARY_USER_ID) ? theme.success : theme.danger }]}>{preview.liveRecipients.length === 1 && preview.liveRecipients[0]?.userId === LIVE_CANARY_USER_ID ? `Live canary confirmed: only ${preview.liveRecipients[0].email ?? 'target user'} (${LIVE_CANARY_USER_ID}) will trade Live.` : preview.liveRecipients.length === 0 ? `Live canary target ${LIVE_CANARY_USER_ID} is not currently eligible; no Live order will be created.` : 'Live canary mismatch: publishing is blocked.'}</Text>{preview.blockedByCode.length ? <Text style={[styles.meta, { color: theme.textMuted }]}>{preview.blockedByCode.map((item) => `${item.count} ${item.code.toLowerCase().replaceAll('_', ' ')}`).join(' · ')}</Text> : null}<ActionButton disabled={!preview.validation.publishable || (preview.liveRecipients.length > 0 && (preview.liveRecipients.length !== 1 || preview.liveRecipients[0]?.userId !== LIVE_CANARY_USER_ID))} label="Authenticate & publish" loading={busy} onPress={() => void publish()} /></Card> : null}
 
     </AppBottomSheet>
     </>

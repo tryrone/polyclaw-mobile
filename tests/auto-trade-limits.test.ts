@@ -7,9 +7,10 @@ const home = readFileSync('src/app/(consumer)/home.tsx', 'utf8');
 const adminSettings = readFileSync('src/app/(admin)/admin/settings.tsx', 'utf8');
 
 describe('user-controlled Auto-trade limits', () => {
-  it('validates personal limits without silently imposing retired platform ceilings', () => {
-    assert.doesNotMatch(accountLimits, /platformMaxTradeUsdc/);
-    assert.doesNotMatch(accountLimits, /platformMaxDayUsdc/);
+  it('shows personal authorization and the lower effective platform ceilings', () => {
+    assert.match(accountLimits, /platformMaxTradeUsdc/);
+    assert.match(accountLimits, /platformMaxDayUsdc/);
+    assert.match(accountLimits, /live canary currently applies the lower platform caps/);
     assert.match(accountLimits, /day < per/);
     assert.match(home, /Existing limits never increase automatically/);
   });
@@ -31,6 +32,7 @@ describe('user-controlled Auto-trade limits', () => {
     assert.match(accountLimits, /Switch to Live\?/);
     assert.match(accountLimits, /dedicated PolyClaw execution wallet/);
     assert.match(accountLimits, /linked Polymarket wallet remains read-only/);
+    assert.match(accountLimits, /refreshTradingLocation/);
     assert.match(accountLimits, /autoTradeModeNotice/);
   });
 

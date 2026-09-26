@@ -69,7 +69,10 @@ export default function ConsumerHome() {
     if (!data) return;
     const action: PolyClawPrimaryAction = data.primaryAction;
     if (action === 'FUND' || action === 'NONE') { router.push('/account' as never); return; }
-    if (action === 'ENABLE') void run(() => consumer('enableAutoTrade'), 'Auto-trade enabled.');
+    if (action === 'ENABLE') void run(async () => {
+      if (data.executionMode === 'LIVE') await consumer('refreshTradingLocation');
+      await consumer('enableAutoTrade');
+    }, 'Auto-trade enabled.');
     if (action === 'PAUSE') void run(() => consumer('pauseAutoTrade', { reason: 'Paused by user' }), 'Auto-trade paused.');
   };
 

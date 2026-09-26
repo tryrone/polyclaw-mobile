@@ -235,6 +235,7 @@ export function useAccountController() {
       }, 'Bot signer authorized for 30 days. It cannot withdraw funds.')),
       revoke: () => protectedRun(() => run('revoke', () => consumer('revokeSigner'), 'Signer revocation started.')),
       enable: () => protectedRun(() => run('enable', async () => {
+        await consumer('refreshTradingLocation');
         const prepared = await consumer<{ activationPayload: string }>('prepareLiveActivation', { platform: 'IOS' });
         const ownerSignature = await ownerWallet.signMessage(prepared.activationPayload);
         await consumer('enableLiveBot', { platform: 'IOS', activationPayload: prepared.activationPayload, ownerSignature });

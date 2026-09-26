@@ -343,6 +343,7 @@ export type ConsumerHomeStatus = {
   liveAccess: { available: boolean; reason: string | null };
   limits: {
     perTradeUsdc: number; dailyUsdc: number; requestedPerTradeUsdc: number; requestedDailyUsdc: number;
+    platformMaxTradeUsdc: number; platformMaxDayUsdc: number;
     dailyUsedUsdc: number; dailyRemainingUsdc: number;
     approvedStakePreviewUsdc: number; resetsAt: string;
   };
@@ -396,6 +397,7 @@ export type AdminBatchPreview = {
   validation: { rows: AdminSignalValidation[]; publishable: boolean };
   eligibleUsers: number; blockedUsers: number; blockedByCode: { code: string; count: number }[];
   aggregateExposureUsdc: number; testUsers: number; liveUsers: number; testExposureUsdc: number; liveExposureUsdc: number;
+  liveRecipients: { userId: string; email: string | null }[];
   signals: { ordinal: number; requestedUsdc: number; allocatedUsdc: number; executableLiquidityUsdc: number | null; bestAsk: number | null }[];
 };
 

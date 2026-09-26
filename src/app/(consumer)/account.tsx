@@ -5,7 +5,7 @@ import { ThemePicker } from '@/components/theme-picker';
 import { ConsumerAccountSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Header, ResourceState, Screen } from '@/components/ui-kit';
 import { SignerItem } from '@/features/account/access-items';
-import { SubscriptionItem, WalletItem } from '@/features/account/membership-items';
+import { PolymarketHistoryItem, SubscriptionItem, WalletItem } from '@/features/account/membership-items';
 import { AccountMessageBanner, AccountProfile, SettingsGroup } from '@/features/account/primitives';
 import { NotificationItem } from '@/features/account/preference-items';
 import { AccountControlsItem, SafetyItem } from '@/features/account/security-items';
@@ -39,6 +39,7 @@ export default function ConsumerAccountScreen() {
 
       <SettingsGroup title="Account">
         <AutoTradeItem />
+        <PolymarketHistoryItem controller={controller} />
         {controller.subscription.visible ? <SubscriptionItem controller={controller} /> : null}
         {controller.wallet.account?.walletSetupAvailable ? <WalletItem controller={controller} /> : null}
         {controller.wallet.account?.walletSetupAvailable ? <SignerItem controller={controller} /> : null}
