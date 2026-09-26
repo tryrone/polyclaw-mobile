@@ -1,17 +1,26 @@
 import { router } from 'expo-router';
-import { Check, Pause, Play, Wallet } from 'phosphor-react-native';
+import { Check, CheckCircle, Pause, Play, Wallet } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Disclosure } from '@/components/disclosure';
 import { PnlChartCard } from '@/components/pnl-chart-card';
 import { ConsumerHomeSkeleton } from '@/components/page-skeletons';
+import { PressableScale } from '@/components/motion';
 import { ActionButton, Card, Header, ResourceState, Screen, StatusPill, money } from '@/components/ui-kit';
 import { useAuth } from '@/auth/provider';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
 import { tradeSelectionLabel } from '@/lib/markets';
 import type { AutoTradePerformance, ConsumerHomeStatus, PolyClawPrimaryAction } from '@/lib/types';
 import { fonts, numeric, radius, spacing, usePolyClawTheme } from '@/theme';
+
+const JURISDICTION_LABELS: Record<string, string> = {
+  NG: 'Nigeria', GH: 'Ghana', KE: 'Kenya', ZA: 'South Africa', RW: 'Rwanda', TZ: 'Tanzania', UG: 'Uganda',
+};
+
+function jurisdictionLabel(code: string) {
+  return JURISDICTION_LABELS[code] ?? code;
+}
 
 /**
  * Home leads with one dominant object: the Auto-trade / wallet hero. Below it are the current
@@ -28,8 +37,12 @@ export default function ConsumerHome() {
   const [message, setMessage] = useState<string | null>(null);
   const [perTrade, setPerTrade] = useState('');
   const [daily, setDaily] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [riskDisclosureAccepted, setRiskDisclosureAccepted] = useState(false);
+  const [jurisdictionCode, setJurisdictionCode] = useState<string | null>(null);
 
   const data = resource.data;
+  const supportedJurisdictions = data?.supportedJurisdictions ?? [];
   const limitsEdited = useRef(false);
   useEffect(() => {
     if (data?.limits && !limitsEdited.current) {
@@ -71,6 +84,13 @@ export default function ConsumerHome() {
       await consumer('configureAutoTradeLimits', { perTradeUsdc: per, dailyUsdc: day });
     }, 'Limits saved. Tap Enable when you are ready.');
   };
+
+  const needsEligibility = Boolean(data && data.blockers.some((blocker) => blocker.code === 'AGE_RISK_INCOMPLETE' || blocker.code === 'JURISDICTION_UNSUPPORTED'));
+  const submitEligibility = () => run(async () => {
+    if (!ageConfirmed || !riskDisclosureAccepted) { setMessage('Confirm your age and acknowledge the risk first.'); return; }
+    if (!jurisdictionCode) { setMessage('Choose your jurisdiction.'); return; }
+    await consumer('confirmEligibility', { ageConfirmed: true, riskDisclosureAccepted: true, jurisdictionCode });
+  }, 'Eligibility confirmed.');
 
   const heroState = !data ? 'SYNCING'
     : !data.ready ? 'SETUP NEEDED'
@@ -133,6 +153,35 @@ export default function ConsumerHome() {
           {data.blockers.slice(0, 4).map((blocker) => (
             <Text key={blocker.code} style={[styles.blocker, { color: theme.textMuted }]}>· {blocker.label}</Text>
           ))}
+        </Card>
+      ) : null}
+
+      {data && needsEligibility ? (
+        <Card style={styles.setupCard}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Confirm your details</Text>
+          <Text style={[styles.copy, { color: theme.textMuted }]}>Confirm your age, acknowledge the risk, and select your jurisdiction before trading.</Text>
+          <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: ageConfirmed }} accessibilityLabel="I am at least 18 years old." haptic="select" onPress={() => setAgeConfirmed((value) => !value)} style={styles.checkRow}>
+            {ageConfirmed ? <CheckCircle size={21} color={theme.success} weight="fill" /> : <View style={[styles.checkBox, { borderColor: theme.borderStrong }]} />}
+            <Text style={[styles.checkText, { color: theme.text }]}>I am at least 18 years old.</Text>
+          </PressableScale>
+          <PressableScale accessibilityRole="checkbox" accessibilityState={{ checked: riskDisclosureAccepted }} accessibilityLabel="I understand I can lose my full stake and results are not guaranteed." haptic="select" onPress={() => setRiskDisclosureAccepted((value) => !value)} style={styles.checkRow}>
+            {riskDisclosureAccepted ? <CheckCircle size={21} color={theme.success} weight="fill" /> : <View style={[styles.checkBox, { borderColor: theme.borderStrong }]} />}
+            <Text style={[styles.checkText, { color: theme.text }]}>I understand I can lose my full stake and results are not guaranteed.</Text>
+          </PressableScale>
+          <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Jurisdiction</Text>
+          <View style={styles.jurisdictionRow}>
+            {supportedJurisdictions.map((code) => (
+              <PressableScale key={code} accessibilityRole="button" accessibilityState={{ selected: jurisdictionCode === code }} haptic="select" onPress={() => setJurisdictionCode(code)}>
+                <View style={[styles.jurisdictionChip, { backgroundColor: jurisdictionCode === code ? theme.accent : theme.field, borderColor: jurisdictionCode === code ? theme.accent : theme.border }]}>
+                  <Text style={[styles.jurisdictionText, { color: jurisdictionCode === code ? theme.background : theme.text }]}>{jurisdictionLabel(code)}</Text>
+                </View>
+              </PressableScale>
+            ))}
+          </View>
+          {!supportedJurisdictions.length ? (
+            <Text style={[styles.message, { color: theme.warning }]}>Eligibility options are temporarily unavailable. Please try again later.</Text>
+          ) : null}
+          <ActionButton label="Confirm" loading={busy} disabled={!ageConfirmed || !riskDisclosureAccepted || !jurisdictionCode} onPress={submitEligibility} />
         </Card>
       ) : null}
 
@@ -238,6 +287,12 @@ const styles = StyleSheet.create({
   heroValue: { fontFamily: fonts.displayLight, fontSize: 44, letterSpacing: -1.2, ...numeric },
   input: { borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, fontFamily: fonts.semibold, fontSize: 15, minHeight: 44, paddingHorizontal: spacing.md },
   message: { fontFamily: fonts.medium, fontSize: 12.5 },
+  checkRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  checkBox: { borderRadius: 4, borderWidth: 1.5, height: 21, width: 21 },
+  checkText: { flex: 1, fontFamily: fonts.regular, fontSize: 13.5, lineHeight: 19 },
+  jurisdictionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  jurisdictionChip: { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, minHeight: 40, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  jurisdictionText: { fontFamily: fonts.semibold, fontSize: 13 },
   previewHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
   previewMeta: { fontFamily: fonts.medium, fontSize: 11.5 },
   previewRow: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.md, minHeight: 52 },

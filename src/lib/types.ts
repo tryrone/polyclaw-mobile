@@ -352,6 +352,7 @@ export type ConsumerHomeStatus = {
     result: ConsumerTradeResult | null; actualStakeUsdc: number; returnedUsdc: number | null; feesUsdc: number; netPnlUsdc: number | null;
   }[];
   consent: { currentVersion: number; acceptedVersion: number | null; fresh: boolean };
+  supportedJurisdictions?: string[];
 };
 
 export type ConsumerCopyConsent = { currentVersion: number; acceptedVersion: number | null; acceptedAt: string | null; fresh: boolean };

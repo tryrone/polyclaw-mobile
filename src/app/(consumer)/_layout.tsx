@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { ArrowsLeftRight, HouseSimple, User } from 'phosphor-react-native';
 
 import { PolyClawTabBar, type TabItem } from '@/components/tab-bar';
+import { useWalkthrough, Walkthrough } from '@/components/walkthrough';
 import { useAuth } from '@/auth/provider';
 
 /**
@@ -17,6 +18,7 @@ const tabs: (TabItem & { name: string })[] = [
 
 export default function ConsumerLayout() {
   const { session } = useAuth();
+  const tour = useWalkthrough();
   if (session?.user.role !== 'USER') return null;
   return (
     <BottomClearanceProvider>
@@ -25,7 +27,8 @@ export default function ConsumerLayout() {
           <Tabs.Screen key={name} name={name} />
         ))}
       </Tabs>
-      <PolyClawTabBar items={tabs} />
+      {tour.resolved && !tour.visible ? <PolyClawTabBar items={tabs} /> : null}
+      {tour.visible ? <Walkthrough onDone={tour.dismiss} /> : null}
     </BottomClearanceProvider>
   );
 }
