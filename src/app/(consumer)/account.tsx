@@ -4,6 +4,7 @@ import { SignOut } from 'phosphor-react-native';
 import { ThemePicker } from '@/components/theme-picker';
 import { ConsumerAccountSkeleton } from '@/components/page-skeletons';
 import { ActionButton, Header, ResourceState, Screen } from '@/components/ui-kit';
+import { useWalkthroughControls } from '@/components/walkthrough';
 import { LiveSetupItem } from '@/features/account/access-items';
 import { PolymarketHistoryItem, SubscriptionItem } from '@/features/account/membership-items';
 import { AccountMessageBanner, AccountProfile, SettingsGroup } from '@/features/account/primitives';
@@ -21,6 +22,7 @@ import { usePolyClawTheme } from '@/theme';
 export default function ConsumerAccountScreen() {
   const { theme } = usePolyClawTheme();
   const controller = useAccountController();
+  const walkthrough = useWalkthroughControls();
   const initialLoading = controller.resource.loading && controller.resource.data === null;
 
   if (initialLoading) return (
@@ -54,6 +56,7 @@ export default function ConsumerAccountScreen() {
 
       <SettingsGroup title="Advanced">
         <PolymarketHistoryItem controller={controller} />
+        <ActionButton label="Replay setup walkthrough" variant="secondary" onPress={() => walkthrough?.show()} />
       </SettingsGroup>
 
       <ActionButton

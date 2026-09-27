@@ -1,9 +1,9 @@
 import { BottomClearanceProvider } from '@/components/bottom-clearance';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { ArrowsLeftRight, HouseSimple, User } from 'phosphor-react-native';
 
 import { PolyClawTabBar, type TabItem } from '@/components/tab-bar';
-import { useWalkthrough, Walkthrough } from '@/components/walkthrough';
+import { useWalkthrough, Walkthrough, WalkthroughProvider } from '@/components/walkthrough';
 import { useAuth } from '@/auth/provider';
 
 /**
@@ -18,17 +18,23 @@ const tabs: (TabItem & { name: string })[] = [
 
 export default function ConsumerLayout() {
   const { session } = useAuth();
-  const tour = useWalkthrough();
+  const tour = useWalkthrough(session?.user.id ?? 'consumer');
   if (session?.user.role !== 'USER') return null;
+  const openSetup = () => {
+    tour.dismiss();
+    router.replace('/account' as never);
+  };
   return (
-    <BottomClearanceProvider>
-      <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
-        {tabs.map(({ name }) => (
-          <Tabs.Screen key={name} name={name} />
-        ))}
-      </Tabs>
-      {tour.resolved && !tour.visible ? <PolyClawTabBar items={tabs} /> : null}
-      {tour.visible ? <Walkthrough onDone={tour.dismiss} /> : null}
-    </BottomClearanceProvider>
+    <WalkthroughProvider value={tour}>
+      <BottomClearanceProvider>
+        <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
+          {tabs.map(({ name }) => (
+            <Tabs.Screen key={name} name={name} />
+          ))}
+        </Tabs>
+        {tour.resolved && !tour.visible ? <PolyClawTabBar items={tabs} /> : null}
+        {tour.visible ? <Walkthrough onDone={tour.dismiss} onSetup={openSetup} userName={session.user.name} /> : null}
+      </BottomClearanceProvider>
+    </WalkthroughProvider>
   );
 }

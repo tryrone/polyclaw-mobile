@@ -3,7 +3,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { AppState, type AppStateStatus } from 'react-native';
 import { adminRequest, consumerRequest, loginUser, loginWithApple, logoutUser, operatorRequest, refreshUser, registerUser, type AdminProcedure, type ConsumerAutoTradeProcedure, type ConsumerProcedure } from '@/lib/api';
 import { readBiometricEnabled, readSession, writeBiometricEnabled, writeSession } from '@/lib/storage';
-import { signInWithGoogle as googleSignIn } from '@/auth/google';
+import { signInWithGoogle as googleSignIn, signOutFromGoogle } from '@/auth/google';
 import type { AuthSession, OperatorEnvelope } from '@/lib/types';
 import { biometricLoginEnabled, nextLockStateAfterSessionSave, recoveryBlocksProcedure, requiresMandatoryBiometric, shouldRelockAfterBackground } from '@/auth/biometric-policy';
 
@@ -120,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => save(await googleSignIn()), [save]);
   const signOut = useCallback(async () => {
     if (session) await logoutUser(session).catch(() => undefined);
+    await signOutFromGoogle().catch(() => undefined);
     await save(null);
   }, [save, session]);
   const setBiometricEnabled = useCallback((enabled: boolean) => {
@@ -137,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const beginRecoveryReauthentication = useCallback(async () => {
     recoveryPending.current = true;
     if (session) await logoutUser(session).catch(() => undefined);
+    await signOutFromGoogle().catch(() => undefined);
     await save(null);
   }, [save, session]);
 

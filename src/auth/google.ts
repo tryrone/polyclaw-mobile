@@ -22,9 +22,14 @@ export async function signInWithGoogle() {
   if (!module) throw new Error('Google sign in requires a PolyClaw development or store build.');
   module.GoogleOneTapSignIn.configure({ webClientId, iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() });
   await module.GoogleOneTapSignIn.checkPlayServices(true);
-  let response = await module.GoogleOneTapSignIn.signIn();
-  if (module.isNoSavedCredentialFoundResponse(response)) response = await module.GoogleOneTapSignIn.createAccount();
+  const response = await module.GoogleOneTapSignIn.createAccount();
   if (!module.isSuccessResponse(response)) throw responseError(module, response);
   if (!response.data.idToken) throw new Error('Google sign in did not return an ID token.');
   return loginWithGoogleIdToken(response.data.idToken);
+}
+
+export async function signOutFromGoogle() {
+  const module = await nativeModule();
+  if (!module) return;
+  await module.GoogleOneTapSignIn.signOut();
 }
