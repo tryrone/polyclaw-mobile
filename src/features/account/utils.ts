@@ -3,6 +3,15 @@ import type { ApprovalChecklistItem } from './types';
 
 export type NotificationKey = keyof ConsumerAccount['notifications'];
 
+export type LiveSetupStepId = 'access' | 'wallet' | 'approvals' | 'funding' | 'review' | 'signer' | 'activation';
+
+export type LiveSetupStep = {
+  id: LiveSetupStepId;
+  label: string;
+  detail: string;
+  passed: boolean;
+};
+
 export const notificationPreferences = [
   {
     key: 'authorizationExpiry',
@@ -113,6 +122,82 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
       label: '30-day bot authorization',
       detail: 'Passkey authorization can trade and close, but cannot withdraw',
       passed: Boolean(account?.signerStatus === 'ACTIVE' && account.signerExpiresAt && new Date(account.signerExpiresAt) > new Date()),
+    },
+  ];
+}
+
+export function buildLiveSetupSteps(account?: ConsumerAccount): LiveSetupStep[] {
+  const botReasons = account?.approval?.botReasons ?? [];
+  const accessAndDisclosuresReady = Boolean(
+    account?.access?.active
+      && !lacks(botReasons, 'invite_required', 'adult_confirmation_required', 'risk_disclosure_required'),
+  );
+  const approvalsConfirmed = Boolean(
+    account?.depositWalletAddress
+      && ['FUNDING_PENDING', 'FUNDED'].includes(account.walletLifecycle),
+  );
+  const availablePusd = Number(account?.availablePusd ?? 0);
+  const fundingReady = Boolean(
+    account?.walletLifecycle === 'FUNDED'
+      && Number.isFinite(availablePusd)
+      && availablePusd >= (account?.funding.minimumReadyPusd ?? 15),
+  );
+  const signerActive = Boolean(
+    account?.signerStatus === 'ACTIVE'
+      && account.signerExpiresAt
+      && new Date(account.signerExpiresAt) > new Date(),
+  );
+
+  return [
+    {
+      id: 'access',
+      label: 'Access and disclosures',
+      detail: accessAndDisclosuresReady ? 'Subscription or pilot access and required disclosures are active.' : 'Complete access, age, and risk disclosure requirements.',
+      passed: accessAndDisclosuresReady,
+    },
+    {
+      id: 'wallet',
+      label: 'Create your dedicated wallet',
+      detail: account?.depositWalletAddress ? 'Your PolyClaw owner and deposit wallet are ready.' : 'Create the wallet used only for PolyClaw trading and withdrawals.',
+      passed: Boolean(account?.embeddedOwnerAddress && account.depositWalletAddress),
+    },
+    {
+      id: 'approvals',
+      label: 'Approve trading contracts',
+      detail: approvalsConfirmed ? 'Owner-signed trading approvals are confirmed.' : 'Approve only the contracts needed to trade; withdrawals stay excluded.',
+      passed: approvalsConfirmed,
+    },
+    {
+      id: 'funding',
+      label: 'Fund the trading wallet',
+      detail: fundingReady
+        ? `${availablePusd.toFixed(2)} pUSD available.`
+        : `Deposit at least ${(account?.funding.minimumReadyPusd ?? 15).toFixed(2)} USDC for the live canary.`,
+      passed: fundingReady,
+    },
+    {
+      id: 'review',
+      label: 'Confirm the Live review',
+      detail: account?.approvalStatus === 'APPROVED' ? 'Wallet evidence and risk acknowledgement are approved.' : 'Review the risks and submit your funded wallet evidence.',
+      passed: account?.approvalStatus === 'APPROVED',
+    },
+    {
+      id: 'signer',
+      label: 'Authorize the restricted signer',
+      detail: signerActive
+        ? `CLOB-only authorization expires ${new Date(account!.signerExpiresAt!).toLocaleDateString()}.`
+        : 'Polymarket Session Key approval must be confirmed before this 30-day authorization can finish.',
+      passed: signerActive,
+    },
+    {
+      id: 'activation',
+      label: 'Activate Live access',
+      detail: account?.mode === 'LIVE'
+        ? 'Live access is active. Choose Live and enable Auto-trade below.'
+        : signerActive && account?.approval.globalEngineApproved && account.approval.platformApproved
+          ? 'Sign the final activation message, then choose Live and enable Auto-trade.'
+          : 'This unlocks after signer authorization and the operator safety release.',
+      passed: account?.mode === 'LIVE',
     },
   ];
 }

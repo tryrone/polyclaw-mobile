@@ -1,5 +1,6 @@
 export type AccountSectionKey =
   | 'subscription'
+  | 'live-setup'
   | 'wallet'
   | 'polymarket'
   | 'approval'

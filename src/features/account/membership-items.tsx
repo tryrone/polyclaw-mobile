@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
-import { ArrowCounterClockwise, CreditCard, LinkSimple, ShieldCheck, Wallet } from 'phosphor-react-native';
+import * as Clipboard from 'expo-clipboard';
+import { ArrowCounterClockwise, Check, Copy, CreditCard, LinkSimple, ShieldCheck, Wallet } from 'phosphor-react-native';
 import { ActionButton } from '@/components/ui-kit';
 import { usePolyClawTheme } from '@/theme';
 import { AccountItem } from './primitives';
@@ -63,6 +65,7 @@ export function PolymarketHistoryItem({ controller }: { controller: AccountContr
   const { theme } = usePolyClawTheme();
   const { wallet, ui } = controller;
   const linkedAddress = wallet.account?.readOnlyAddress;
+  const [copied, setCopied] = useState(false);
   return (
     <AccountItem
       Icon={LinkSimple}
@@ -73,7 +76,7 @@ export function PolymarketHistoryItem({ controller }: { controller: AccountContr
       expanded={ui.expanded === 'polymarket'}
       onPress={() => ui.toggleSection('polymarket')}
     >
-      <Text style={[styles.body, { color: theme.textMuted }]}>Link an existing Polymarket address to view its history. It is never used to place trades, hold deposits, or authorize the PolyClaw signer.</Text>
+      <Text style={[styles.body, { color: theme.textMuted }]}>Optional: link an existing Polymarket address to view its history. It is never used to place trades, hold deposits, or authorize the PolyClaw signer.</Text>
       <TextInput
         accessibilityLabel="Existing Polymarket wallet address"
         autoCapitalize="none"
@@ -89,6 +92,13 @@ export function PolymarketHistoryItem({ controller }: { controller: AccountContr
       {wallet.challenge && !linkedAddress ? <>
         <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>SIGN THIS EXACT TEXT</Text>
         <Text selectable style={[styles.challenge, { backgroundColor: theme.field, color: theme.text }]}>{wallet.challenge}</Text>
+        <ActionButton
+          label={copied ? 'Challenge copied' : 'Copy challenge'}
+          icon={(copied ? Check : Copy) as never}
+          variant="secondary"
+          onPress={() => void Clipboard.setStringAsync(wallet.challenge!).then(() => setCopied(true))}
+        />
+        <Text style={[styles.footnote, { color: theme.textMuted }]}>Open the wallet that controls this address, choose its Sign message or Sign personal message action, sign the copied text exactly, then paste the returned signature below. If your wallet cannot sign arbitrary messages, skip this optional link.</Text>
         <TextInput
           accessibilityLabel="Wallet ownership signature"
           autoCapitalize="none"
