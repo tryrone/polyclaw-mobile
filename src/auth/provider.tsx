@@ -164,12 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session?.user.role !== 'USER') return;
     const subscription = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
-      void consumer('refreshTradingLocation')
-        .catch(() => undefined)
-        .finally(() => setForegroundRefreshVersion((version) => version + 1));
+      setForegroundRefreshVersion((version) => version + 1);
     });
     return () => subscription.remove();
-  }, [consumer, session?.user.role]);
+  }, [session?.user.role]);
 
   const admin = useCallback(async <T,>(procedure: AdminProcedure, input?: Record<string, unknown>) => {
     const active = await freshSession();

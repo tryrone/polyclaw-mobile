@@ -10,7 +10,7 @@ import {
 } from '@/billing/revenuecat';
 import { useConsumerDashboard } from '@/hooks/use-consumer-dashboard';
 import { useConsumerResource } from '@/hooks/use-consumer-resource';
-import type { ConsumerAccount, DepositSetup, OwnerActionPreparation } from '@/lib/types';
+import type { ConsumerAccount, DepositSetup, OwnerActionPreparation, SignerAuthorizationPreparation } from '@/lib/types';
 import { usePolyClawWallet } from '@/wallet/privy-provider';
 import type { AccountMessage, AccountSectionKey, BusyOperation, RiskAcknowledgements } from './types';
 import {
@@ -229,9 +229,12 @@ export function useAccountController() {
     signer: {
       account: account.data,
       renew: () => protectedRun(() => run('renew', async () => {
-        const prepared = await consumer<{ authorizationPayload: string }>('renewSigner');
-        const ownerSignature = await ownerWallet.signMessage(prepared.authorizationPayload);
-        await consumer('authorizeBotSigner', { authorizationPayload: prepared.authorizationPayload, ownerSignature, platform: 'IOS' });
+        const prepared = await consumer<SignerAuthorizationPreparation>('renewSigner');
+        if (prepared.withdrawalAuthorized || prepared.scopes.length !== 1 || prepared.scopes[0] !== 'CLOB') {
+          throw new Error('The signer request exceeded the permitted CLOB-only scope.');
+        }
+        const ownerSignature = await ownerWallet.signTypedData(prepared.authorizationTypedData);
+        await consumer('authorizeBotSigner', { ownerSignature, platform: 'IOS' });
       }, 'Bot signer authorized for 30 days. It cannot withdraw funds.')),
       revoke: () => protectedRun(() => run('revoke', () => consumer('revokeSigner'), 'Signer revocation started.')),
       enable: () => protectedRun(() => run('enable', async () => {

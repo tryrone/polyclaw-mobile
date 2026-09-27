@@ -63,19 +63,13 @@ export function AutoTradeItem() {
 
   const toggle = () => {
     if (data?.enabled) void run(() => consumer('pauseAutoTrade', { reason: 'Paused from Account' }), 'Auto-trade paused.');
-    else void run(async () => {
-      if (data?.executionMode === 'LIVE') await consumer('refreshTradingLocation');
-      return consumer('enableAutoTrade');
-    }, 'Auto-trade enabled.');
+    else void run(() => consumer('enableAutoTrade'), 'Auto-trade enabled.');
   };
 
   const setMode = (mode: 'PAPER' | 'LIVE') => {
     if (!data || data.executionMode === mode) return;
     const apply = () => void run(
-      async () => {
-        if (mode === 'LIVE') await consumer('refreshTradingLocation');
-        return consumer<AutoTradeModeResult>('configureAutoTradeMode', { mode });
-      },
+      () => consumer<AutoTradeModeResult>('configureAutoTradeMode', { mode }),
       (result) => autoTradeModeNotice(mode, result),
     );
     if (mode === 'LIVE') {

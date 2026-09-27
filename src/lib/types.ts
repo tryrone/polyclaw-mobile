@@ -114,6 +114,13 @@ export type OwnerActionPreparation = {
   status: string;
 };
 
+export type SignerAuthorizationPreparation = {
+  authorizationTypedData: Record<string, unknown>;
+  authorizationExpiresAt: string;
+  scopes: string[];
+  withdrawalAuthorized: boolean;
+};
+
 export type DepositSetup = {
   addresses: { evm?: string; svm?: string; btc?: string; tron?: string; [key: string]: string | undefined };
   supportedAssets: { chainId: string; assetId?: string; tokenAddress?: string; symbol?: string; name?: string; decimals?: number }[];

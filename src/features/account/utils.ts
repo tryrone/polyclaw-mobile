@@ -92,9 +92,9 @@ export function buildApprovalChecklist(account?: ConsumerAccount): ApprovalCheck
     },
     {
       id: 'eligibility',
-      label: 'Eligible location and risk quiz',
-      detail: 'Location must remain eligible; complete the acknowledgements below',
-      passed: Boolean(approval && !lacks(botReasons, 'jurisdiction_not_eligible', 'risk_quiz_required')),
+      label: 'Risk acknowledgements',
+      detail: 'Complete the trading-risk acknowledgements below',
+      passed: Boolean(approval && !lacks(botReasons, 'risk_quiz_required')),
     },
     {
       id: 'wallet',

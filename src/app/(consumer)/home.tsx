@@ -70,7 +70,6 @@ export default function ConsumerHome() {
     const action: PolyClawPrimaryAction = data.primaryAction;
     if (action === 'FUND' || action === 'NONE') { router.push('/account' as never); return; }
     if (action === 'ENABLE') void run(async () => {
-      if (data.executionMode === 'LIVE') await consumer('refreshTradingLocation');
       await consumer('enableAutoTrade');
     }, 'Auto-trade enabled.');
     if (action === 'PAUSE') void run(() => consumer('pauseAutoTrade', { reason: 'Paused by user' }), 'Auto-trade paused.');
@@ -88,7 +87,7 @@ export default function ConsumerHome() {
     }, 'Limits saved. Tap Enable when you are ready.');
   };
 
-  const needsEligibility = Boolean(data && data.blockers.some((blocker) => blocker.code === 'AGE_RISK_INCOMPLETE' || blocker.code === 'JURISDICTION_UNSUPPORTED'));
+  const needsEligibility = Boolean(data && data.blockers.some((blocker) => blocker.code === 'AGE_RISK_INCOMPLETE'));
   const submitEligibility = () => run(async () => {
     if (!ageConfirmed || !riskDisclosureAccepted) { setMessage('Confirm your age and acknowledge the risk first.'); return; }
     if (!jurisdictionCode) { setMessage('Choose your jurisdiction.'); return; }

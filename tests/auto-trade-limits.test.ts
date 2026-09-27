@@ -32,7 +32,8 @@ describe('user-controlled Auto-trade limits', () => {
     assert.match(accountLimits, /Switch to Live\?/);
     assert.match(accountLimits, /dedicated PolyClaw execution wallet/);
     assert.match(accountLimits, /linked Polymarket wallet remains read-only/);
-    assert.match(accountLimits, /refreshTradingLocation/);
+    assert.doesNotMatch(accountLimits, /refreshTradingLocation/);
+    assert.doesNotMatch(home, /refreshTradingLocation/);
     assert.match(accountLimits, /autoTradeModeNotice/);
   });
 

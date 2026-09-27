@@ -18,12 +18,23 @@ describe('optional read-only Polymarket linking', () => {
     assert.match(accountScreen, /PolymarketHistoryItem/);
   });
 
-  it('refreshes opaque trading-location evidence on foreground and before live activation', () => {
+  it('refreshes account data on foreground without refreshing trading-location evidence', () => {
     assert.match(authProvider, /AppState\.addEventListener/);
-    assert.match(authProvider, /consumer\('refreshTradingLocation'\)/);
+    assert.doesNotMatch(authProvider, /consumer\('refreshTradingLocation'\)/);
     assert.match(authProvider, /foregroundRefreshVersion/);
     assert.match(consumerResource, /foregroundRefreshVersion/);
+  });
+
+  it('refreshes trading-location evidence only as part of live activation', () => {
     assert.match(controller, /refreshTradingLocation/);
     assert.match(controller, /prepareLiveActivation/);
+  });
+
+  it('authorizes the official CLOB-only session key with typed data and no withdrawal scope', () => {
+    assert.match(controller, /authorizationTypedData/);
+    assert.match(controller, /signTypedData/);
+    assert.match(controller, /prepared\.scopes\[0\] !== 'CLOB'/);
+    assert.match(controller, /prepared\.withdrawalAuthorized/);
+    assert.doesNotMatch(controller, /authorizationPayload/);
   });
 });
